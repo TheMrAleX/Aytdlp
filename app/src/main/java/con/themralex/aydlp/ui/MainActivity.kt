@@ -2,7 +2,6 @@ package con.themralex.aydlp.ui
 
 import android.Manifest
 import android.app.LocaleManager
-import android.app.PictureInPictureParams
 import android.content.*
 import android.net.Uri
 import android.os.*
@@ -12,12 +11,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import con.themralex.aydlp.core.Transfers
 import con.themralex.aydlp.domain.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
-import org.json.JSONObject
 
 @AndroidEntryPoint class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -89,6 +86,15 @@ import org.json.JSONObject
             }
         }
 
+    override fun attachBaseContext(newBase: Context) {
+        val locale = newBase.getSharedPreferences("locale", MODE_PRIVATE).getString("language", "").orEmpty()
+        if (Build.VERSION.SDK_INT < 33 && locale.isNotBlank()) {
+            val config = android.content.res.Configuration(newBase.resources.configuration)
+            config.setLocales(LocaleList.forLanguageTags(locale))
+            super.attachBaseContext(newBase.createConfigurationContext(config))
+        } else super.attachBaseContext(newBase)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -150,6 +156,7 @@ import org.json.JSONObject
                         getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(value)
                     }
                     ;vm.text("locale", value)
+                    if (Build.VERSION.SDK_INT < 33) { getSharedPreferences("locale", MODE_PRIVATE).edit().putString("language", value).apply(); recreate() }
                 },
                 battery = { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
             )

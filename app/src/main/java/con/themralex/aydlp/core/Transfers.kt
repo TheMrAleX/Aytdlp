@@ -77,6 +77,16 @@ class Notifications(
                 )
             }
         }
+        if (Build.VERSION.SDK_INT >= 36 && row != null && row.state in con.themralex.aydlp.domain.StateMachine.active) {
+            b.setStyle(
+                NotificationCompat
+                    .ProgressStyle()
+                    .addProgressSegment(NotificationCompat.ProgressStyle.Segment(100))
+                    .setProgress(row.progress.toInt())
+                    .setProgressIndeterminate(row.total == 0L),
+            )
+            b.setRequestPromotedOngoing(true).setShortCriticalText("${row.progress.toInt()}%")
+        }
         return b.build()
     }
 
@@ -114,7 +124,10 @@ object Transfers {
                     .Builder()
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .apply {
-                        if (s.wifi) { addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED); addTransportType(NetworkCapabilities.TRANSPORT_WIFI) }
+                        if (s.wifi) {
+                            addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+                            addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                        }
                     }.build()
             val job =
                 JobInfo
@@ -284,7 +297,13 @@ class QueueWakeWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        Transfers.start(applicationContext, false)
+        if (Build.VERSION.SDK_INT >= 34) {
+            Transfers.start(applicationContext, false)
+        } else {
+            val notices = Notifications(applicationContext)
+            setForeground(ForegroundInfo(410, notices.notification()))
+            background(applicationContext).queue().drain { notices.update(it) }
+        }
         return Result.success()
     }
 }

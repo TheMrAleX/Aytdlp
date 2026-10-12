@@ -373,11 +373,8 @@ object Errors {
         random: Random = Random.Default,
     ): Long = min(3_600_000L, 15_000L * (1L shl attempt.coerceIn(0, 8))) + random.nextLong(0, 10_000)
 
-    fun redact(text: String): String =
-        text
-            .replace(
-                Regex("(?i)(cookie|authorization|po_token|token|password)([=: ]+)[^\\s]+"),
-                "$1$2[REDACTED]",
-            ).replace(Regex("https?://[^\\s]+"), "[URL]")
-            .takeLast(32_768)
+    fun redact(text: String): String = text
+        .replace(Regex("(?im)(cookie|authorization|po_token|token|password)([=: ]+)[^\\n\\r]*"), "$1$2[REDACTED]")
+        .replace(Regex("https?://[^\\s]+"), "[URL]")
+        .takeLast(32_768)
 }

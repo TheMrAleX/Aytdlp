@@ -8,9 +8,9 @@ import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
 import con.themralex.aydlp.domain.FileNames
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -44,7 +44,7 @@ import javax.inject.Singleton
                                     ByteArray(256 * 1024)
                                 ;var done = 0L
                                 while (true) {
-                                currentCoroutineContext().ensureActive()
+                                    currentCoroutineContext().ensureActive()
                                     val n = input.read(bytes)
                                     if (n <
                                         0
@@ -106,7 +106,7 @@ import javax.inject.Singleton
                                         ByteArray(256 * 1024)
                                     ;var done = 0L
                                     while (true) {
-                                currentCoroutineContext().ensureActive()
+                                        currentCoroutineContext().ensureActive()
                                         val n = input.read(bytes)
                                         if (n <
                                             0

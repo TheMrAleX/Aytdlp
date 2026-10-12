@@ -27,7 +27,10 @@ import javax.inject.Singleton
         val dao = db.downloads()
         val flow = dao.observe()
         private val claim = Mutex()
+        private val recovery = Mutex()
+        private var recovered = false
         private val running = ConcurrentHashMap<String, Job>()
+        private val drainLock = Mutex()
 
         suspend fun enqueue(
             input: String,
@@ -104,43 +107,47 @@ import javax.inject.Singleton
             dao.all().filter { it.state in setOf(DownloadState.PAUSED, DownloadState.FAILED) }.forEach { resume(it.id) }
         }
 
-        suspend fun reconcile() {
-            native.reconcile()
-            dao
-                .all()
-                .filter {
-                    it.state in StateMachine.active
-                }.forEach { transition(it.id, DownloadState.PAUSED, "Interrupted safely; resume to continue") }
-        }
+        suspend fun reconcile() =
+            recovery.withLock {
+                if (recovered) return@withLock
+                native.reconcile()
+                dao.all().filter { it.state in StateMachine.active }.forEach { row ->
+                    if (transition(row.id, DownloadState.PAUSED, "Interrupted; refreshing extraction")) transition(row.id, DownloadState.QUEUED)
+                }
+                recovered = true
+            }
 
         suspend fun drain(onChanged: suspend (DownloadRow) -> Unit) =
-            coroutineScope {
-                while (isActive) {
-                    val s = settings.get()
-                    var rows = dao.all()
-                    rows
-                        .filter {
-                            it.state == DownloadState.SCHEDULED && it.scheduled <= System.currentTimeMillis()
-                        }.forEach { transition(it.id, DownloadState.QUEUED) }
-                    rows = dao.all()
-            val queued = rows.filter { it.state == DownloadState.QUEUED }
-                    val capacity = (s.concurrency.coerceIn(1, 6) - running.size).coerceAtLeast(0)
-                    queued.take(capacity).forEach { row ->
-                        if (claim.withLock { transition(row.id, DownloadState.ANALYZING) }) {
-                            val job =
-                                launch(start = CoroutineStart.LAZY) {
-                                    try {
-                                        execute(row.id, onChanged)
-                                    } finally {
-                                        running.remove(row.id)
+            drainLock.withLock {
+                coroutineScope {
+                    reconcile()
+                    while (isActive) {
+                        val s = settings.get()
+                        var rows = dao.all()
+                        rows
+                            .filter {
+                                it.state == DownloadState.SCHEDULED && it.scheduled <= System.currentTimeMillis()
+                            }.forEach { transition(it.id, DownloadState.QUEUED) }
+                        rows = dao.all()
+                        val queued = rows.filter { it.state == DownloadState.QUEUED }
+                        val capacity = (s.concurrency.coerceIn(1, 6) - running.size).coerceAtLeast(0)
+                        queued.take(capacity).forEach { row ->
+                            if (claim.withLock { transition(row.id, DownloadState.ANALYZING) }) {
+                                val job =
+                                    launch(start = CoroutineStart.LAZY) {
+                                        try {
+                                            execute(row.id, onChanged)
+                                        } finally {
+                                            running.remove(row.id)
+                                        }
                                     }
-                                }
-                            running[row.id] = job
-                            job.start()
+                                running[row.id] = job
+                                job.start()
+                            }
                         }
+                        if (running.isEmpty() && queued.isEmpty()) break
+                        delay(350)
                     }
-                    if (running.isEmpty() && queued.isEmpty()) break
-                    delay(350)
                 }
             }
 
@@ -152,7 +159,9 @@ import javax.inject.Singleton
             try {
                 val row = dao.get(id) ?: return
                 val info = engine.analyze(row.url, "analysis-$id")
-                val estimate = (info.size.takeIf { it > 0 } ?: 300_000_000L) * 2 + 100_000_000L
+                val selectedProfile = ProfileJson.decode(row.profile)
+                val mediaEstimate = if (selectedProfile.audio && info.duration > 0) info.duration * selectedProfile.bitrate * 125 else info.size.takeIf { it > 0 } ?: 300_000_000L
+                val estimate = mediaEstimate * 2 + 100_000_000L
                 check(StatFs(directory.path).availableBytes >= estimate) { "No space left for download and merge" }
                 val current = dao.get(id) ?: return
                 if (current.state != DownloadState.ANALYZING) return
@@ -205,7 +214,8 @@ import javax.inject.Singleton
                 val failure = Errors.classify(e.message.orEmpty())
                 transition(id, DownloadState.FAILED, "${failure.kind}: ${failure.action}")
                 val row = dao.get(id)
-                if (row != null && failure.kind.retryable &&
+                if (row != null &&
+                    failure.kind.retryable &&
                     row.attempt < 3
                 ) {
                     val whenRetry =
@@ -218,16 +228,16 @@ import javax.inject.Singleton
         }
 
         suspend fun yieldRunning() {
-        running.keys.toList().forEach { id ->
-            pause(id)
-            val row = dao.get(id)
-            if (row?.state == DownloadState.PAUSED) {
-                if (transition(id, DownloadState.QUEUED)) transition(id, DownloadState.SCHEDULED, "System paused; waiting for constraints")
+            running.keys.toList().forEach { id ->
+                pause(id)
+                val row = dao.get(id)
+                if (row?.state == DownloadState.PAUSED) {
+                    if (transition(id, DownloadState.QUEUED)) transition(id, DownloadState.SCHEDULED, "System paused; waiting for constraints")
+                }
             }
         }
-    }
 
-    suspend fun stopRunning() {
+        suspend fun stopRunning() {
             running.keys.toList().forEach { pause(it) }
         }
     }

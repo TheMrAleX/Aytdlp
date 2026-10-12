@@ -26,6 +26,7 @@ import javax.inject.Singleton
         private val cookies: CookieVault,
     ) : ExtractionEngine {
         private val initialization = Mutex()
+        private val launches = Mutex()
         private val processes = ConcurrentHashMap<String, Process>()
         private val groups = ConcurrentHashMap<String, Int>()
         private var initialized = false
@@ -82,10 +83,15 @@ import javax.inject.Singleton
             withContext(Dispatchers.IO) {
                 initialize()
                 val process =
-                    builder(
-                        listOf(File(native, "libpython.so").path, launcher.path, selected.path, token) + options,
-                    ).redirectErrorStream(true).start()
-                check(processes.putIfAbsent(token, process) == null) { "Process already running" }
+                    launches.withLock {
+                        check(!processes.containsKey(token)) { "Process already running" }
+                        val child =
+                            builder(listOf(File(native, "libpython.so").path, launcher.path, selected.path, token) + options)
+                                .redirectErrorStream(true)
+                                .start()
+                        processes[token] = child
+                        child
+                    }
                 val buffer = StringBuilder()
                 try {
                     process.inputStream.bufferedReader().useLines { lines ->
@@ -391,7 +397,8 @@ import javax.inject.Singleton
                                 j.optInt("fragments"),
                             ),
                         )
-                    } else if (line.startsWith("[Merger]") || line.startsWith("[ExtractAudio]") ||
+                    } else if (line.startsWith("[Merger]") ||
+                        line.startsWith("[ExtractAudio]") ||
                         line.startsWith("[Embed")
                     ) {
                         onProgress(Progress(null, phase = "merge"))
