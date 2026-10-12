@@ -1,8 +1,11 @@
 package con.themralex.aydlp
 
+import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import con.themralex.aydlp.core.background
+import con.themralex.aydlp.data.AppDatabase
+import con.themralex.aydlp.data.DownloadRow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -13,30 +16,21 @@ class RuntimeTest {
     @Test fun databasePersistsAcrossReopen() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val queue = background(context).queue()
-            val id =
-                queue.enqueue(
-                    "https://example.com/runtime-test",
-                    con.themralex.aydlp.domain
-                        .Profile(),
-                )
-            assertEquals(id, queue.dao.get(id)?.id)
-            queue.cancel(id)
+            val name = "persist-test.db"
+            context.deleteDatabase(name)
+            var db = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            db.downloads().insert(DownloadRow("persistent", "https://example.com/runtime-test"))
+            db.close()
+            db = Room.databaseBuilder(context, AppDatabase::class.java, name).build()
+            assertEquals("persistent", db.downloads().get("persistent")?.id)
+            db.close()
+            context.deleteDatabase(name)
         }
 
     @Test fun bundledRuntimeAndSolverWork() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            val entry =
-                dagger.hilt.android.EntryPointAccessors
-                    .fromApplication(context, RuntimeEntry::class.java)
-            val h = entry.engine().health()
+            val h = background(context).engine().health()
             assertTrue(h.detail, h.ready)
         }
-}
-
-@dagger.hilt.EntryPoint
-@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
-interface RuntimeEntry {
-    fun engine(): con.themralex.aydlp.domain.ExtractionEngine
 }

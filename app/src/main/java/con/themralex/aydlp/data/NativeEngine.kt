@@ -27,6 +27,7 @@ import javax.inject.Singleton
     ) : ExtractionEngine {
         private val initialization = Mutex()
         private val launches = Mutex()
+        private val healthChecks = Mutex()
         private val processes = ConcurrentHashMap<String, Process>()
         private val groups = ConcurrentHashMap<String, Int>()
         private var initialized = false
@@ -152,52 +153,54 @@ import javax.inject.Singleton
             }
 
         override suspend fun health(): EngineHealth =
-            withContext(Dispatchers.IO) {
-                try {
-                    initialize()
-                    val runtime =
-                        builder(
-                            listOf(File(native, "libqjs.so").path, "-e", "console.log(6*7)"),
-                        ).redirectErrorStream(true).start()
-                    val text =
-                        runtime.inputStream
-                            .bufferedReader()
-                            .readText()
-                            .trim()
-                    check(runtime.waitFor() == 0 && text == "42") { "QuickJS self-test failed: $text" }
-                    val version = run("health", listOf("--version")).trim()
-                    val chosen = if (current.exists()) current else bundled
-                    val solver =
-                        ZipFile(chosen).use { zip ->
-                            if (zip.entries().asSequence().any {
-                                    it.name.startsWith("yt_dlp_ejs/")
+            healthChecks.withLock {
+                withContext(Dispatchers.IO) {
+                    try {
+                        initialize()
+                        val runtime =
+                            builder(
+                                listOf(File(native, "libqjs.so").path, "-e", "console.log(6*7)"),
+                            ).redirectErrorStream(true).start()
+                        val text =
+                            runtime.inputStream
+                                .bufferedReader()
+                                .readText()
+                                .trim()
+                        check(runtime.waitFor() == 0 && text == "42") { "QuickJS self-test failed: $text" }
+                        val version = run("health", listOf("--version")).trim()
+                        val chosen = if (current.exists()) current else bundled
+                        val solver =
+                            ZipFile(chosen).use { zip ->
+                                if (zip.entries().asSequence().any {
+                                        it.name.startsWith("yt_dlp_ejs/")
+                                    }
+                                ) {
+                                    "Bundled EJS"
+                                } else {
+                                    error("Bundled EJS solver missing; update yt-dlp")
                                 }
-                            ) {
-                                "Bundled EJS"
-                            } else {
-                                error("Bundled EJS solver missing; update yt-dlp")
                             }
-                        }
-                    val ff = builder(listOf(File(native, "libffmpeg.so").path, "-version")).redirectErrorStream(true).start()
-                    val ffVersion =
-                        ff.inputStream
-                            .bufferedReader()
-                            .readLines()
-                            .firstOrNull()
-                            .orEmpty()
-                    check(ff.waitFor() == 0)
-                    EngineHealth(
-                        true,
-                        version,
-                        "QuickJS · arithmetic passed",
-                        solver,
-                        ffVersion,
-                        "Runtime checks passed. Live extraction requires a separate smoke test.",
-                    )
-                } catch (
-                    e: Exception,
-                ) {
-                    EngineHealth(false, "Unavailable", "Check runtime", "Check solver", "Check FFmpeg", Errors.redact(e.message.orEmpty()))
+                        val ff = builder(listOf(File(native, "libffmpeg.so").path, "-version")).redirectErrorStream(true).start()
+                        val ffVersion =
+                            ff.inputStream
+                                .bufferedReader()
+                                .readLines()
+                                .firstOrNull()
+                                .orEmpty()
+                        check(ff.waitFor() == 0)
+                        EngineHealth(
+                            true,
+                            version,
+                            "QuickJS · arithmetic passed",
+                            solver,
+                            ffVersion,
+                            "Runtime checks passed. Live extraction requires a separate smoke test.",
+                        )
+                    } catch (
+                        e: Exception,
+                    ) {
+                        EngineHealth(false, "Unavailable", "Check runtime", "Check solver", "Check FFmpeg", Errors.redact(e.message.orEmpty()))
+                    }
                 }
             }
 

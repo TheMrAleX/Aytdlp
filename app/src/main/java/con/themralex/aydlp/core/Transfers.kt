@@ -108,6 +108,8 @@ interface BackgroundEntry {
     fun settings(): SettingsStore
 
     fun updater(): EngineUpdater
+
+    fun engine(): con.themralex.aydlp.domain.ExtractionEngine
 }
 
 fun background(context: Context) = EntryPointAccessors.fromApplication(context.applicationContext, BackgroundEntry::class.java)

@@ -38,3 +38,6 @@ Recursive inspection found five WebP libraries inside the published FFmpeg paylo
 
 ## Live extraction evidence
 Host yt-dlp 2026.08.19 with Node extracted jNQXAC9IVRw: 16 formats and 16 direct URLs. No media download or Android execution is implied. The old BaW_jenozKc test returned unavailable, so the smoke URL was changed. Smoke rejection preserves the previous engine and may indicate network/video availability rather than an extractor defect.
+
+## Final build evidence
+A clean real release build succeeded with R8/resource shrinking and RSA-4096 signing. Four ABI/universal APKs passed signature, SDK ZIP alignment and recursive ELF checks; 14 compiled domain tests passed via JUnitCore, with two separate host fault-fixture tests. ktlint and detekt passed; lintRelease reports 0 errors, 18 warnings. A prior multi-build invocation collided on Gradle PID/cache locks in this isolated environment; final builds ran sequentially after clean. The GitHub App connection cannot write repository secrets; signed tag publication remains gated on owner setup. No release was fabricated or published unsigned.

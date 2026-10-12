@@ -4,12 +4,12 @@
 - Maven/Google Maven, Gradle, GitHub and YouTube HTTPS responses checked.
 - Real host extraction with yt-dlp 2026.08.19 / Node: jNQXAC9IVRw returned 16 formats with direct URLs. Media bytes and Android extraction were not tested by this command.
 - Real debug build: ARM64, ARMv7, x86_64 and universal APKs.
-- 13 compiled domain JUnit tests passed via JUnitCore. The additional cookie-header test is being compiled for the final validation run.
+- 14 compiled domain JUnit tests passed via JUnitCore, including cookie-header redaction.
 - Two deterministic process-fault tests passed: transfer interruption with preserved partial bytes and kill during merge without publishing the incomplete output. These test the deterministic fixture, not actual YouTube media.
 - Rebuilt five misaligned WebP libraries for each 64-bit ABI; recursive audit of universal debug APK inspected 776 ELF files with zero incompatible entries.
 - SDK zipalign -c -P 16 -v 4 passed for the universal debug APK.
 - Detekt completed with zero findings under the documented configuration.
-- Release with RSA-4096 signing/R8 produced APKs; final rebuild, lint and signature/alignment acceptance are recorded after completion.
+- Clean release build with RSA-4096 signing/R8 succeeded. ktlintCheck, detekt and lintRelease passed; lint has 0 errors and 18 warnings. All four signed release APKs passed apksigner, zipalign -P 16 and recursive ELF audits (258 ARM64, 258 ARMv7, 260 x86_64, 776 universal ELF files). SHA256SUMS.txt records final hashes. GitHub release publication still requires signing secrets managed by the repository owner.
 
 ## Device checks required
 Open Settings/Maintenance and run Health check; QuickJS, EJS and FFmpeg must be ready. Analyze a public video, download video and audio, play both, test a shared link, decline notifications once, then grant them and check actions. Pause halfway, close/reopen, resume and verify the file. Test interruption during merge, Wi-Fi changes, charging rules, reboot and SD/SAF storage. Force-stop requires user relaunch by Android design. Run a 16 KB device/emulator with `adb shell getconf PAGE_SIZE` equal to 16384. Test API 26, 33, 34, 36 and 37 and an aggressive OEM. Do not assume 6+ hour or Doze behavior without measuring it.
