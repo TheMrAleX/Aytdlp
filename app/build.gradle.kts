@@ -6,7 +6,8 @@ plugins {
 }
 android {
     namespace = "con.themralex.aydlp"
-    compileSdk = 36
+    compileSdk { version = release(37) { minorApiLevel = 2 } }
+    buildToolsVersion = "37.0.0"
     defaultConfig {
         applicationId = "con.themralex.aydlp"
         minSdk = 26
@@ -16,8 +17,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
-    buildFeatures { compose = true; buildConfig = true }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     signingConfigs {
         create("release") {
             val keyFile = System.getenv("AYTDLP_KEYSTORE")
@@ -37,8 +44,25 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-    packaging { jniLibs { useLegacyPackaging = true }; resources { excludes += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*") } }
-    lint { abortOnError = true; checkReleaseBuilds = true }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+        resources {
+            excludes +=
+                listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")
+        }
+    }
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+    }
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 dependencies {

@@ -17,8 +17,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+      - name: Install current SDK components
+        run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+      - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0' 'ndk;28.2.13676358'
       - uses: gradle/actions/setup-gradle@v4
       - name: Prepare verified engine and rebuild misaligned WebP dependencies
         run: |
@@ -31,7 +32,7 @@ jobs:
       - name: Audit packaged native libraries
         run: |
           python3 scripts/audit_native.py app/build/outputs/apk/debug/app-debug.apk > native-audit.json
-          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -52,8 +53,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+      - name: Install current SDK components
+        run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+      - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0' 'ndk;28.2.13676358'
       - uses: gradle/actions/setup-gradle@v4
       - run: |
           python3 scripts/prepare_engine.py
@@ -73,8 +75,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for apk in app/build/outputs/apk/release/*.apk; do
-            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk"
-            "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk"
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$apk"
+            "$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 -v 4 "$apk"
             python3 scripts/audit_native.py "$apk" > "$apk.native.json"
           done
           sha256sum app/build/outputs/apk/release/*.apk > SHA256SUMS

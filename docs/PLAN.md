@@ -1,6 +1,6 @@
 # Aytdlp implementation plan
 
-Native Kotlin app: `con.themralex.aydlp`, minSdk 26, compileSdk 37. No telemetry, accounts or DRM circumvention.
+Native Kotlin app: `con.themralex.aydlp`, minSdk 26, compileSdk 37.2. No telemetry, accounts or DRM circumvention.
 
 ## Architecture
 `app` assembles ui/designsystem, ui/screens, domain, data and core packages. Domain contains only Kotlin queue transitions, profiles, URL/argument validation, failure classification and file naming. `ExtractionEngine` isolates native execution. Hilt provides a single process registry, Room database, DataStore settings and engine. Compose observes StateFlow; background workers never depend on a screen.
