@@ -6,7 +6,7 @@ plugins {
 }
 android {
     namespace = "con.themralex.aydlp"
-    compileSdk = 37
+    compileSdk = 36
     defaultConfig {
         applicationId = "con.themralex.aydlp"
         minSdk = 26
@@ -67,7 +67,8 @@ dependencies {
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("androidx.documentfile:documentfile:1.1.0")
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+    implementation(files("../native/ffmpeg-16kb.aar"))
+    implementation("io.github.junkfood02.youtubedl-android:common:0.18.1")
     debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
