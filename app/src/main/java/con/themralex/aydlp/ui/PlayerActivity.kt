@@ -17,6 +17,7 @@ import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
 import con.themralex.aydlp.core.PlaybackService
 
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 class PlayerActivity : ComponentActivity() {
     private var controller: MediaController? = null
     private var view: PlayerView? = null

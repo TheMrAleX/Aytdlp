@@ -40,6 +40,11 @@ import java.util.Locale
     language: (String) -> Unit,
     battery: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val hidden by vm.hiddenMedia.collectAsStateWithLifecycle()
+    var editingMedia by remember { mutableStateOf<DownloadRow?>(null) }
+    var editedName by remember { mutableStateOf("") }
+    var editedTag by remember { mutableStateOf("") }
     val settings by vm.settings.collectAsStateWithLifecycle()
     val rows by vm.downloads.collectAsStateWithLifecycle()
     val info by vm.info.collectAsStateWithLifecycle()
@@ -50,6 +55,7 @@ import java.util.Locale
     var tab by remember { mutableIntStateOf(0) }
     var input by remember { mutableStateOf("") }
     var showProfile by remember { mutableStateOf(false) }
+    var editingDownload by remember { mutableStateOf<String?>(null) }
     var schedule by remember { mutableStateOf("") }
     var query by remember { mutableStateOf("") }
     var stateFilter by remember { mutableStateOf("All") }
@@ -135,7 +141,7 @@ import java.util.Locale
                                         enabled =
                                             input.isNotBlank() && !busy,
                                     ) { vm.analyze(input) }
-                                    ;AyButton(tr("Paste", "Pegar"), primary = false) { input = clipboard() }
+                                    AyButton(tr("Paste", "Pegar"), primary = false) { input = clipboard() }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Chip(tr("Import .txt", "Importar .txt")) { importLinks() }
@@ -176,7 +182,7 @@ import java.util.Locale
                                                 showProfile =
                                                     true
                                             }
-                                            ;Chip(tr("One tap", "Un toque")) { enqueue(media.url, 0) }
+                                            Chip(tr("One tap", "Un toque")) { enqueue(media.url, 0) }
                                         }
                                         AyButton(tr("Add to queue", "Añadir a cola"), Modifier.fillMaxWidth()) { enqueue(media.url, 0) }
                                         Field(schedule, {
@@ -243,7 +249,7 @@ import java.util.Locale
                                                 color = t.muted,
                                             )
                                         }
-                                        ;Chip(
+                                        Chip(
                                             if (profile.formatId ==
                                                 f.id
                                             ) {
@@ -303,7 +309,11 @@ import java.util.Locale
                                         vm.message.value =
                                             tr("Press Start to run resumed transfers", "Pulsa Iniciar para ejecutar las transferencias")
                                     }
-                                }, onCancel = { vm.action { vm.queue.cancel(row.id) } })
+                                }, onCancel = { vm.action { vm.queue.cancel(row.id) } }, onEdit = {
+                                    editingDownload = row.id
+                                    vm.profile.value = ProfileJson.decode(row.profile)
+                                    showProfile = true
+                                })
                             }
                         }
                     }
@@ -349,6 +359,11 @@ import java.util.Locale
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         AyButton(tr("Play", "Reproducir"), Modifier.weight(1f)) { open(row) }
                                         AyButton(tr("Share", "Compartir"), primary = false) { share(row) }
+                                        Chip(tr("More", "Más")) {
+                                            editingMedia = row
+                                            editedName = row.title
+                                            editedTag = row.tag
+                                        }
                                     }
                                 }
                             }
@@ -376,7 +391,49 @@ import java.util.Locale
                 }
             }
         }
-        if (showProfile) ProfileSheet(vm, es) { showProfile = false }
+        editingMedia?.let { row ->
+            Dialog(onDismissRequest = { editingMedia = null }) {
+                Panel {
+                    Label(tr("Manage file", "Gestionar archivo"), size = 24, bold = true)
+                    Field(editedName, { editedName = it }, tr("Filename", "Nombre del archivo"))
+                    AyButton(tr("Rename", "Renombrar"), primary = false) {
+                        vm.action {
+                            vm.library.rename(row, editedName)
+                            editingMedia = null
+                        }
+                    }
+                    Field(editedTag, { editedTag = it }, tr("Tags", "Etiquetas"))
+                    AyButton(tr("Save tags", "Guardar etiquetas"), primary = false) {
+                        vm.action {
+                            vm.library.tag(row, editedTag)
+                            editingMedia = null
+                        }
+                    }
+                    AyButton(tr("Open with another app", "Abrir con otra app"), primary = false) {
+                        runCatching {
+                            context.startActivity(
+                                android.content
+                                    .Intent(android.content.Intent.ACTION_VIEW)
+                                    .setDataAndType(android.net.Uri.parse(row.destination), context.contentResolver.getType(android.net.Uri.parse(row.destination)) ?: "video/*")
+                                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                            )
+                        }.onFailure { vm.message.value = it.message.orEmpty() }
+                    }
+                    AyButton(tr("Delete · 10 second undo", "Borrar · deshacer durante 10 s"), primary = false) {
+                        vm.deleteLater(row)
+                        editingMedia = null
+                    }
+                    AyButton(tr("Close", "Cerrar")) { editingMedia = null }
+                }
+            }
+        }
+        if (showProfile) {
+            ProfileSheet(vm, es, onSave = {
+                val id = editingDownload
+                if (id != null) vm.action { vm.queue.dao.profile(id, ProfileJson.encode(vm.profile.value)) } else vm.saveProfile()
+                editingDownload = null
+            }) { showProfile = false }
+        }
         if (!settings.onboarded) {
             Dialog(onDismissRequest = {
             }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -392,7 +449,12 @@ import java.util.Locale
                             size = 17,
                             color = t.muted,
                         )
-                        Label(LocalContext.current.getString(con.themralex.aydlp.R.string.legal), size = 12, color = t.muted)
+                        Label(
+                            androidx.compose.ui.res
+                                .stringResource(con.themralex.aydlp.R.string.legal),
+                            size = 12,
+                            color = t.muted,
+                        )
                         AyButton(tr("Let's begin", "Comenzar"), Modifier.fillMaxWidth()) { vm.boolean("onboarded", true) }
                     }
                 }
@@ -418,6 +480,7 @@ import java.util.Locale
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val t = LocalTokens.current
     Panel {
@@ -439,7 +502,8 @@ import java.util.Locale
                 )
             }
         }
-        ;ProgressBar(row.progress)
+        if (row.state !in StateMachine.active) Chip(if (es) "Editar perfil" else "Edit profile", onClick = onEdit)
+        ProgressBar(row.progress)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Label("${row.progress.toInt()}% · ${bytes(row.bytes)}", size = 12)
             Label("${bytes(row.speed.toLong())}/s · ${duration(row.eta)}", size = 12, color = t.muted)
@@ -459,7 +523,7 @@ import java.util.Locale
             } else {
                 AyButton(if (es) "Pausar" else "Pause", Modifier.weight(1f), primary = false, onClick = onPause)
             }
-            ;AyButton(if (es) "Cancelar" else "Cancel", primary = false, onClick = onCancel)
+            AyButton(if (es) "Cancelar" else "Cancel", primary = false, onClick = onCancel)
         }
     }
 }
@@ -467,6 +531,7 @@ import java.util.Locale
 @Composable private fun ProfileSheet(
     vm: MainViewModel,
     es: Boolean,
+    onSave: () -> Unit = { vm.saveProfile() },
     onClose: () -> Unit,
 ) {
     val p by vm.profile.collectAsStateWithLifecycle()
@@ -578,7 +643,7 @@ import java.util.Locale
                 AyButton(tr("Save profile", "Guardar perfil"), Modifier.fillMaxWidth()) {
                     runCatching { AdvancedArguments.parse(p.custom) }
                         .onSuccess {
-                            vm.saveProfile()
+                            onSave()
                             onClose()
                         }.onFailure {
                             vm.message.value =
@@ -657,7 +722,7 @@ import java.util.Locale
                             "Español",
                             s.locale == "es",
                         ) { language("es") }
-                        ;Chip("English", s.locale == "en") { language("en") }
+                        Chip("English", s.locale == "en") { language("en") }
                     }
                 }
             }
@@ -767,7 +832,7 @@ import java.util.Locale
                         vm.action {
                             vm.message.value =
                                 tr("Checking official release…", "Comprobando release oficial…")
-                            ;vm.message.value = vm.updater.update()
+                            vm.message.value = vm.updater.update()
                             vm.health.value =
                                 vm.engine.health()
                         }
@@ -793,7 +858,7 @@ import java.util.Locale
                                     vm.engine.health()
                             }
                         }
-                        ;AyButton(tr("Copy report", "Copiar informe"), primary = false) { copy(vm.diagnostic()) }
+                        AyButton(tr("Copy report", "Copiar informe"), primary = false) { copy(vm.diagnostic()) }
                     }
                 }
             }
@@ -808,7 +873,12 @@ import java.util.Locale
             }
         }
         item {
-            Label(LocalContext.current.getString(con.themralex.aydlp.R.string.legal), size = 12, color = t.muted)
+            Label(
+                androidx.compose.ui.res
+                    .stringResource(con.themralex.aydlp.R.string.legal),
+                size = 12,
+                color = t.muted,
+            )
             Label("Aytdlp 0.1.0 · GPL-3.0 · yt-dlp / FFmpeg / QuickJS", size = 11, color = t.muted)
         }
     }
@@ -834,6 +904,7 @@ import java.util.Locale
     onDownload: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val profile by vm.profile.collectAsStateWithLifecycle()
     val s by vm.settings.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     AyTheme(s.theme, s.accent) {
@@ -842,7 +913,7 @@ import java.util.Locale
             Panel(Modifier.fillMaxWidth().padding(12.dp).windowInsetsPadding(WindowInsets.navigationBars)) {
                 Label("Aytdlp", size = 26, bold = true)
                 Label(input, color = t.muted, maxLines = 3)
-                Label(vm.profile.value.name, color = t.accent)
+                Label(profile.name, color = t.accent)
                 if (message.isNotBlank()) Label(message, size = 12)
                 AyButton("Download / Descargar", Modifier.fillMaxWidth(), onClick = onDownload)
                 AyButton("Close / Cerrar", Modifier.fillMaxWidth(), primary = false, onClick = onClose)
@@ -860,7 +931,8 @@ private fun bytes(value: Long): String =
         value >= 1_048_576 -> {
             "%.1f MB".format(value / 1_048_576.0)
         }
-        ;value
+
+        value
 
             >= 1024 -> {
             "%.0f KB".format(value / 1024.0)

@@ -9,6 +9,7 @@ import org.junit.Test
 
 class UiSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
     @Test fun onboardingAndNavigation() {
         compose.onNodeWithText("Let's begin").performClick()
         compose.onNodeWithText("Queue").performClick()

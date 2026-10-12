@@ -80,7 +80,7 @@ val Manrope = FontFamily(Font(R.font.manrope, FontWeight.Normal), Font(R.font.ma
                 accent = Accents[accent.coerceIn(0, 7)],
             )
         }
-    ;CompositionLocalProvider(LocalTokens provides t) { content() }
+    CompositionLocalProvider(LocalTokens provides t) { content() }
 }
 
 @Composable fun Label(

@@ -42,7 +42,7 @@ import javax.inject.Singleton
                             file.inputStream().use { input ->
                                 val bytes =
                                     ByteArray(256 * 1024)
-                                ;var done = 0L
+                                var done = 0L
                                 while (true) {
                                     currentCoroutineContext().ensureActive()
                                     val n = input.read(bytes)
@@ -104,7 +104,7 @@ import javax.inject.Singleton
                                 file.inputStream().use { input ->
                                     val bytes =
                                         ByteArray(256 * 1024)
-                                    ;var done = 0L
+                                    var done = 0L
                                     while (true) {
                                         currentCoroutineContext().ensureActive()
                                         val n = input.read(bytes)

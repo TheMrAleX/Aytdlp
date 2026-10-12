@@ -18,10 +18,38 @@ import javax.inject.Inject
         val updater: EngineUpdater,
         val cookies: CookieVault,
         val backup: Backup,
+        val library: MediaLibrary,
     ) : ViewModel() {
         val settings = settingsStore.flow.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
         val downloads = queue.flow.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
         val profiles = queue.dao.profiles().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        val hiddenMedia = MutableStateFlow<Set<String>>(emptySet())
+        private val deleting = mutableMapOf<String, Job>()
+
+        fun deleteLater(row: DownloadRow) {
+            hiddenMedia.value += row.id
+            message.value = "File hidden. Use Undo within 10 seconds."
+            deleting[row.id] =
+                viewModelScope.launch {
+                    delay(10_000)
+                    try {
+                        withContext(Dispatchers.IO) { library.delete(row) }
+                    } catch (e: Exception) {
+                        hiddenMedia.value -= row.id
+                        message.value = e.message.orEmpty()
+                    } finally {
+                        deleting.remove(row.id)
+                    }
+                }
+        }
+
+        fun undoDelete() {
+            deleting.values.forEach { it.cancel() }
+            deleting.clear()
+            hiddenMedia.value = emptySet()
+            message.value = "Restored"
+        }
+
         val info = MutableStateFlow<MediaInfo?>(null)
         val busy = MutableStateFlow(false)
         val message = MutableStateFlow("")
@@ -32,8 +60,8 @@ import javax.inject.Inject
 
         init {
             action {
-                health.value = engine.health()
                 profile.value = ProfileJson.decode(settingsStore.get().lastProfile)
+                health.value = engine.health()
             }
         }
 
@@ -68,7 +96,7 @@ import javax.inject.Inject
                             } else {
                                 engine.analyze(key, "preview")
                             }
-                        ;info.value = value
+                        info.value = value
                         cache[key] =
                             System.currentTimeMillis() to value
                         if (cache.size >

@@ -92,7 +92,9 @@ import kotlinx.coroutines.*
             val config = android.content.res.Configuration(newBase.resources.configuration)
             config.setLocales(LocaleList.forLanguageTags(locale))
             super.attachBaseContext(newBase.createConfigurationContext(config))
-        } else super.attachBaseContext(newBase)
+        } else {
+            super.attachBaseContext(newBase)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,18 +151,32 @@ import kotlinx.coroutines.*
                 },
                 open = { row -> openMedia(row.destination) },
                 share = { row -> share(row.destination) },
-                language = { value ->
-                    if (Build.VERSION.SDK_INT >=
-                        33
-                    ) {
-                        getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(value)
-                    }
-                    ;vm.text("locale", value)
-                    if (Build.VERSION.SDK_INT < 33) { getSharedPreferences("locale", MODE_PRIVATE).edit().putString("language", value).apply(); recreate() }
-                },
+                language = ::updateLanguage,
                 battery = { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
             )
         }
+    }
+
+    private var lastClipboardNotice = 0L
+
+    override fun onResume() {
+        super.onResume()
+        val clipboard = getSystemService(ClipboardManager::class.java)
+        val description = clipboard.primaryClipDescription
+        if (description != null && description.timestamp != lastClipboardNotice && description.hasMimeType("text/plain")) {
+            lastClipboardNotice = description.timestamp
+            vm.message.value = "Clipboard text available · use Paste / Texto en portapapeles · pulsa Pegar"
+        }
+    }
+
+    private fun updateLanguage(value: String) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(value)
+        } else {
+            getSharedPreferences("locale", MODE_PRIVATE).edit().putString("language", value).apply()
+            recreate()
+        }
+        vm.text("locale", value)
     }
 
     private fun requestNotifications() {

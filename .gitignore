@@ -11,3 +11,5 @@ local.properties
 captures/
 native/
 app/src/main/assets/yt-dlp
+docs/dependency-license-inventory.json
+docs/native-upstream-audit.json

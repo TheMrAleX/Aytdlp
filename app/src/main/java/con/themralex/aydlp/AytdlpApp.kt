@@ -16,7 +16,16 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-@HiltAndroidApp class AytdlpApp : Application() {
+@HiltAndroidApp class AytdlpApp :
+    Application(),
+    androidx.work.Configuration.Provider {
+    override val workManagerConfiguration: androidx.work.Configuration
+        get() =
+            androidx.work.Configuration
+                .Builder()
+                .setJobSchedulerJobIdRange(10_000, 20_000)
+                .build()
+
     @Inject lateinit var queue: QueueRepository
 
     override fun onCreate() {

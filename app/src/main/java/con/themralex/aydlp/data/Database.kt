@@ -84,6 +84,12 @@ class Converters {
         time: Long,
     )
 
+    @Query("UPDATE downloads SET profile=:profile WHERE id=:id AND state IN ('QUEUED','SCHEDULED','PAUSED','FAILED')")
+    suspend fun profile(
+        id: String,
+        profile: String,
+    ): Int
+
     @Update suspend fun update(row: DownloadRow)
 
     @Query("UPDATE downloads SET state=:next, failure=:failure WHERE id=:id AND state=:previous")

@@ -82,6 +82,7 @@ class DomainTest {
         assertTrue(Errors.backoff(0, Random(1)) < Errors.backoff(3, Random(1)))
         assertTrue(Errors.backoff(100, Random(1)) <= 3_610_000)
     }
+
     @Test fun cookiesRedactEveryValueOnHeaderLine() {
         val report = Errors.redact("Cookie: SID=first; HSID=second\nHTTP 403")
         assertFalse(report.contains("first"))

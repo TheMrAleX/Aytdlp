@@ -44,7 +44,7 @@ import javax.inject.Singleton
             cipher.init(Cipher.ENCRYPT_MODE, key())
             val temp =
                 File(file.path + ".new")
-            ;temp.writeBytes(cipher.iv + cipher.doFinal(bytes))
+            temp.writeBytes(cipher.iv + cipher.doFinal(bytes))
             check(temp.renameTo(file))
         }
 
