@@ -169,7 +169,7 @@ import javax.inject.Inject
         fun diagnostic(): String {
             val h = health.value
             return Errors.redact(
-                "Aytdlp 0.1.0\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLive extraction has not been proven by the runtime self-test.",
+                "Aytdlp ${con.themralex.aydlp.BuildConfig.VERSION_NAME}\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLive extraction has not been proven by the runtime self-test.",
             )
         }
     }

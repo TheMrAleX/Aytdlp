@@ -2,7 +2,7 @@
 
 Native Kotlin / Compose downloader built around yt-dlp, FFmpeg and QuickJS. Package: `con.themralex.aydlp`. Android 8+ (API 26). Compile SDK 37.2; target SDK 36. GPL-3.0-only.
 
-**Development release 0.1.0. This is not the complete original product specification and is not certified for production use.** A successful host extraction, ELF audit or compilation is not proof of Android extraction or long-running download reliability. See [validation](docs/VALIDATION.md) for executed evidence and remaining scope.
+**Initial release 0.1.0. This is not the complete original product specification and is not certified for production use.** A successful host extraction, ELF audit or compilation is not proof of Android extraction or long-running download reliability. See [validation](docs/VALIDATION.md) for executed evidence and remaining scope.
 
 ## Implemented
 - Paste/search, foreground clipboard availability notice, shared-link sheet, HTTP(S) intents and bounded text batch import.
@@ -32,7 +32,7 @@ Release signing uses environment variables AYTDLP_KEYSTORE (absolute path), AYTD
 Send `ACTION_SEND` with MIME `text/plain` and `Intent.EXTRA_TEXT`, or ACTION_VIEW with an HTTP(S) URL, to ShareActivity. The custom `con.themralex.aydlp.QUEUE` action also accepts `text/plain`/EXTRA_TEXT. All inputs are validated and shown for user-triggered download; a third-party app cannot silently execute custom arguments. Advanced arguments are allowlisted and URLs follow `--`; shell-executing options are rejected.
 
 ## Maintenance
-See [YouTube runbook](docs/MAINTENANCE.md), [architecture plan](docs/PLAN.md) and [decisions](docs/DECISIONS.md). CI compiles and runs checks on pushes; a separate 16 KB emulator job records native/UI results. Signed GitHub release publication needs owner-managed signing secrets. No credentials belong in the repository.
+See [YouTube runbook](docs/MAINTENANCE.md), [architecture plan](docs/PLAN.md) and [decisions](docs/DECISIONS.md). CI compiles and runs checks on pushes; a separate 16 KB emulator job records native/UI results. The initial release bootstraps a signing identity with an encrypted owner backup. Subsequent releases use owner-managed signing secrets; see docs/SIGNING.md. No credentials belong in the repository.
 
 ## Screenshots
 Actual device screenshots are produced by the emulator workflow and uploaded as device evidence. No fabricated screenshots are included before that job succeeds.

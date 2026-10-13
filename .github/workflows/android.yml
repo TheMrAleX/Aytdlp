@@ -5,6 +5,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional release tag, for example v0.1.1'
+        required: false
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -79,42 +84,63 @@ jobs:
             app/build/outputs/androidTest-results/
             screenshots/
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     needs: [verify, device_16kb]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Select release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          tag="${REQUESTED_RELEASE_TAG:-}"
+          if test -z "$tag"; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="$GITHUB_REF_NAME"; else tag=v0.1.0; fi
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release tag'; exit 1; }
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-java@v4
+        if: steps.release.outputs.needed == 'true'
         with:
           distribution: temurin
           java-version: '21'
-      - name: Install current SDK components
+      - name: Install SDK path
+        if: steps.release.outputs.needed == 'true'
         run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
       - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0' 'ndk;28.2.13676358'
+        if: steps.release.outputs.needed == 'true'
       - uses: gradle/actions/setup-gradle@v4
-      - run: |
+        if: steps.release.outputs.needed == 'true'
+      - name: Prepare engine and native dependencies
+        if: steps.release.outputs.needed == 'true'
+        run: |
           python3 scripts/prepare_engine.py
           python3 scripts/prepare_native.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --ninja "$(command -v ninja)"
-      - name: Sign release using owner-managed secrets
+      - name: Build, sign, verify and publish release
+        if: steps.release.outputs.needed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
           KEYSTORE_BASE64: ${{ secrets.AYTDLP_KEYSTORE_BASE64 }}
           AYTDLP_STORE_PASSWORD: ${{ secrets.AYTDLP_STORE_PASSWORD }}
           AYTDLP_KEY_PASSWORD: ${{ secrets.AYTDLP_KEY_PASSWORD }}
-        run: |
-          test -n "$KEYSTORE_BASE64" || { echo 'Signing secrets are required; refusing to publish an unsigned release.'; exit 1; }
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aytdlp.jks"
-          export AYTDLP_KEYSTORE="$RUNNER_TEMP/aytdlp.jks"
-          ./gradlew assembleRelease testReleaseUnitTest lintRelease
-      - name: Audit and publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for apk in app/build/outputs/apk/release/*.apk; do
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify "$apk"
-            "$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 -v 4 "$apk"
-            python3 scripts/audit_native.py "$apk" > "$apk.native.json"
-          done
-          sha256sum app/build/outputs/apk/release/*.apk > SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/release/*.apk SHA256SUMS --title "Aytdlp $GITHUB_REF_NAME" --notes-file SHA256SUMS
+        run: bash scripts/release.sh
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.release.outputs.needed == 'true'
+        with:
+          name: aytdlp-release-and-reports
+          path: |
+            release-assets/
+            app/build/reports/
