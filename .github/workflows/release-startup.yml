@@ -1,0 +1,31 @@
+name: Published release startup diagnosis
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-startup.yml', 'scripts/check_release_startup.sh']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download published release
+        run: curl --fail --location --retry 3 https://github.com/TheMrAleX/Aytdlp/releases/download/v0.1.0/Aytdlp-0.1.0-x86_64.apk --output published-release.apk
+      - name: Enable KVM
+        run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash scripts/check_release_startup.sh published-release.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-release-startup-evidence
+          path: release-startup/
