@@ -53,6 +53,8 @@ import javax.inject.Inject
         val info = MutableStateFlow<MediaInfo?>(null)
         val busy = MutableStateFlow(false)
         val message = MutableStateFlow("")
+        val analysisError = MutableStateFlow("")
+        private val lastAnalysisReport = MutableStateFlow("")
         val health = MutableStateFlow<EngineHealth?>(null)
         val profile = MutableStateFlow(Profile())
         private var analysis: Job? = null
@@ -79,11 +81,14 @@ import javax.inject.Inject
         }
 
         fun analyze(input: String) {
-            analysis?.cancel()
+            val previous = analysis
+            previous?.cancel()
             analysis =
                 viewModelScope.launch {
+                    previous?.join()
                     busy.value = true
                     info.value = null
+                    analysisError.value = ""
                     try {
                         val key = Inputs.normalize(input)
                         val hit = cache[key]
@@ -107,8 +112,13 @@ import javax.inject.Inject
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        message.value =
-                            Errors.classify(e.message.orEmpty()).action + "\n" + Errors.redact(e.message.orEmpty()).takeLast(300)
+                        lastAnalysisReport.value = Errors.redact(e.stackTraceToString())
+                        analysisError.value =
+                            Errors
+                                .redact(e.message.orEmpty())
+                                .lineSequence()
+                                .lastOrNull { it.isNotBlank() }
+                                .orEmpty()
                     } finally {
                         busy.value =
                             false
@@ -117,7 +127,6 @@ import javax.inject.Inject
         }
 
         fun cancelAnalysis() {
-            action { engine.stop("preview") }
             analysis?.cancel()
             busy.value = false
         }
@@ -169,7 +178,7 @@ import javax.inject.Inject
         fun diagnostic(): String {
             val h = health.value
             return Errors.redact(
-                "Aytdlp ${con.themralex.aydlp.BuildConfig.VERSION_NAME}\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLive extraction has not been proven by the runtime self-test.",
+                "Aytdlp ${con.themralex.aydlp.BuildConfig.VERSION_NAME}\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLast analysis error:\n${lastAnalysisReport.value}\nLive extraction has not been proven by the runtime self-test.",
             )
         }
     }

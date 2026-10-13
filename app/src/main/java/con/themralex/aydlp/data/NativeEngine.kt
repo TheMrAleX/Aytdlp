@@ -92,6 +92,17 @@ import javax.inject.Singleton
                         processes[token] = child
                         child
                     }
+                // Cancellation must terminate the process even while readLine blocks.
+                val cancellationGuard =
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            withContext(NonCancellable + Dispatchers.IO) {
+                                if (process.isAlive) stop(token)
+                            }
+                        }
+                    }
                 val buffer = ProcessOutputBuffer()
                 try {
                     process.inputStream.bufferedReader().useLines { lines ->
@@ -111,7 +122,10 @@ import javax.inject.Singleton
                     if (code != 0) error(Errors.redact(buffer.toString()))
                     buffer.toString()
                 } finally {
-                    withContext(NonCancellable) { if (process.isAlive) stop(token) }
+                    withContext(NonCancellable) {
+                        cancellationGuard.cancelAndJoin()
+                        process.outputStream.close()
+                    }
                     processes.remove(token)
                     groups.remove(token)
                     File(context.noBackupFilesDir, "pid-$token").delete()
@@ -232,7 +246,16 @@ import javax.inject.Singleton
             token: String,
         ): MediaInfo {
             val args = baseArgs() + listOf("--dump-single-json", "--skip-download", "--flat-playlist", "--", Inputs.normalize(input))
-            val output = run(token, args)
+            val directory = File(context.noBackupFilesDir, "analysis/$token").apply { mkdirs() }
+            val cookie = cookies.materialize(directory)
+            val output =
+                try {
+                    // Analyze with the same authorized session as the download.
+                    val authenticated = if (cookie == null) args else listOf("--cookies", cookie.path) + args
+                    run(token, authenticated)
+                } finally {
+                    directory.deleteRecursively()
+                }
             val json = JSONObject(output.lineSequence().first { it.startsWith("{") })
             return parse(json, input)
         }

@@ -89,7 +89,7 @@ import javax.inject.Singleton
             if (transition(id, DownloadState.CANCELED)) {
                 engine.stop(id)
                 engine.stop("analysis-$id")
-                running[id]?.cancel()
+                running[id]?.cancelAndJoin()
                 File(context.noBackupFilesDir, "staging/$id").deleteRecursively()
             }
         }
