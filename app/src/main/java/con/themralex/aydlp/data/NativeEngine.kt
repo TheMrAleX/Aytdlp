@@ -14,7 +14,6 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.zip.ZipFile
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -168,17 +167,7 @@ import javax.inject.Singleton
                         check(runtime.waitFor() == 0 && text == "42") { "QuickJS self-test failed: $text" }
                         val version = run("health", listOf("--version")).trim()
                         val chosen = if (current.exists()) current else bundled
-                        val solver =
-                            ZipFile(chosen).use { zip ->
-                                if (zip.entries().asSequence().any {
-                                        it.name.startsWith("yt_dlp_ejs/")
-                                    }
-                                ) {
-                                    "Bundled EJS"
-                                } else {
-                                    error("Bundled EJS solver missing; update yt-dlp")
-                                }
-                            }
+                        val solver = verifySolver(chosen)
                         val ff = builder(listOf(File(native, "libffmpeg.so").path, "-version")).redirectErrorStream(true).start()
                         val ffVersion =
                             ff.inputStream
@@ -202,6 +191,12 @@ import javax.inject.Singleton
                     }
                 }
             }
+
+        suspend fun verifySolver(selected: File): String {
+            val result = run("solver-${selected.name}", listOf("--aytdlp-verify-solver"), selected).trim()
+            check(result == "AYTDLP_EJS_OK") { "Bundled EJS solver verification failed" }
+            return "Bundled EJS · Python ZIP verified"
+        }
 
         private suspend fun baseArgs(): List<String> {
             val s = settings.get()

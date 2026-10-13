@@ -2,6 +2,14 @@
 import os, sys, signal, time, runpy
 engine, token = sys.argv[1:3]
 sys.argv = [engine] + sys.argv[3:]
+# This bounded, read-only check launches no child processes.
+if sys.argv[1:] == ["--aytdlp-verify-solver"]:
+    import zipfile
+    with zipfile.ZipFile(engine) as archive:
+        if not any(name.startswith("yt_dlp_ejs/") for name in archive.namelist()):
+            raise RuntimeError("Bundled EJS solver missing; update yt-dlp")
+    print("AYTDLP_EJS_OK", flush=True)
+    sys.exit(0)
 os.setsid()
 parent = os.getppid()
 group = os.getpid()

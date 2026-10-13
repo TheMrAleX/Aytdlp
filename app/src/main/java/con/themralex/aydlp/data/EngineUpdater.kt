@@ -11,7 +11,6 @@ import org.json.JSONObject
 import java.io.File
 import java.net.URL
 import java.security.MessageDigest
-import java.util.zip.ZipFile
 import javax.inject.Inject
 import javax.inject.Singleton
 import javax.net.ssl.HttpsURLConnection
@@ -135,13 +134,7 @@ import javax.net.ssl.HttpsURLConnection
                         }
                         val actual = digest.digest().joinToString("") { "%02x".format(it) }
                         check(actual == expected) { "Update checksum mismatch" }
-                        ZipFile(staged).use {
-                            check(
-                                it.entries().asSequence().any { entry ->
-                                    entry.name.startsWith("yt_dlp_ejs/")
-                                },
-                            ) { "EJS absent" }
-                        }
+                        engine.verifySolver(staged)
                         engine.run("update-validation", listOf("--version"), staged)
                         engine.run(
                             "update-smoke",
