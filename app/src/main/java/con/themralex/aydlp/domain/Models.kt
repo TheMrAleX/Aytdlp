@@ -131,6 +131,21 @@ interface ExtractionEngine {
     suspend fun stop(token: String)
 }
 
+class ProcessOutputBuffer(
+    private val limit: Int = 2_000_000,
+) {
+    private val text = StringBuilder()
+
+    fun append(line: String) {
+        require(line.length < limit) { "Extractor output line exceeds the safe limit; try a smaller playlist" }
+        val excess = text.length + line.length + 1 - limit
+        if (excess > 0) text.delete(0, excess)
+        text.appendLine(line)
+    }
+
+    override fun toString(): String = text.toString()
+}
+
 object Inputs {
     private val url = Regex("https?://[^\\s<>]+")
 

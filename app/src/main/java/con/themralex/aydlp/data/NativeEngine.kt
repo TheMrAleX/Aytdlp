@@ -93,7 +93,7 @@ import javax.inject.Singleton
                         processes[token] = child
                         child
                     }
-                val buffer = StringBuilder()
+                val buffer = ProcessOutputBuffer()
                 try {
                     process.inputStream.bufferedReader().useLines { lines ->
                         for (line in lines) {
@@ -104,8 +104,7 @@ import javax.inject.Singleton
                                 File(context.noBackupFilesDir, "pid-$token").writeText("$pid")
                             } else {
                                 callback(line)
-                                buffer.appendLine(line.take(64_000))
-                                if (buffer.length > 2_000_000) buffer.delete(0, buffer.length - 2_000_000)
+                                buffer.append(line)
                             }
                         }
                     }

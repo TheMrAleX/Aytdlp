@@ -73,6 +73,21 @@ class DomainTest {
         }
     }
 
+    @Test fun extractorJsonLargerThan64KbRemainsComplete() {
+        val json = "{\"title\":\"" + "a".repeat(100_000) + "\"}"
+        val buffer = ProcessOutputBuffer(120_000)
+        buffer.append("warning".repeat(5_000))
+        buffer.append(json)
+        assertEquals(json, buffer.toString().lineSequence().first { it.startsWith("{") })
+        assertTrue(buffer.toString().length <= 120_000)
+    }
+
+    @Test fun oversizedExtractorLineFailsBeforeReturningCorruptJson() {
+        val buffer = ProcessOutputBuffer(100)
+        assertThrows(IllegalArgumentException::class.java) { buffer.append("x".repeat(100)) }
+        assertEquals("", buffer.toString())
+    }
+
     @Test fun filenamesRespectUtf8Boundary() {
         val output = FileNames.sanitize("😀".repeat(100))
         assertTrue(output.toByteArray().size <= 220)
