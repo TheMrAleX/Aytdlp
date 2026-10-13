@@ -1,0 +1,12 @@
+name: SDK image inventory
+on:
+  push:
+    branches: [diagnosis/sdk-images]
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Available Android 17 packages
+        run: sdkmanager --list | grep -E 'platforms;android-37|system-images;android-37|emulator '
