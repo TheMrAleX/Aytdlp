@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RuntimeTest {
-    @Test fun databasePersistsAcrossReopen() =
+    @Test fun databasePersistsAcrossReopen(): Unit =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             val name = "persist-test.db"
@@ -27,7 +27,7 @@ class RuntimeTest {
             context.deleteDatabase(name)
         }
 
-    @Test fun bundledRuntimeAndSolverWork() =
+    @Test fun bundledRuntimeAndSolverWork(): Unit =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             val h = background(context).engine().health()
