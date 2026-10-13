@@ -12,12 +12,12 @@ cleanup() {
   kill "$emulator_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
-adb wait-for-device
+timeout 180 adb wait-for-device
 ready=0
 for attempt in $(seq 1 150); do
   if test "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 && \
-     adb shell service check input 2>/dev/null | grep -q 'found' && \
-     adb shell service check package 2>/dev/null | grep -q 'found'; then
+     adb shell service check input 2>/dev/null | grep -q ': found' && \
+     adb shell service check package 2>/dev/null | grep -q ': found'; then
     ready=1
     break
   fi

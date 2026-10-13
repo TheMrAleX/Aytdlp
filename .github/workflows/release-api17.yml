@@ -2,7 +2,7 @@ name: Android 17 optimized release startup
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/release-api17.yml']
+    paths: ['.github/workflows/release-api17.yml', 'scripts/check_android17_release.sh', 'scripts/check_release_startup.sh']
   workflow_dispatch:
 permissions:
   contents: read
