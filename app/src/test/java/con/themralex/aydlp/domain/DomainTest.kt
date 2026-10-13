@@ -60,6 +60,19 @@ class DomainTest {
         assertEquals("https://example.com/video", Inputs.normalize("Look: https://example.com/video"))
     }
 
+    @Test fun queuedSearchRemainsStableThroughAnalysisAndDownload() {
+        val normalized = Inputs.normalize("música en español")
+        assertEquals("ytsearch1:música en español", normalized)
+        assertEquals(normalized, Inputs.normalize(Inputs.normalize(normalized)))
+        assertEquals(listOf(normalized), Inputs.batch(normalized + "\n" + normalized))
+    }
+
+    @Test fun normalizedSearchRejectsEmptyOrUnsafeQueries() {
+        for (value in listOf("ytsearch1:", "ytsearch1:--exec=id", "ytsearch1:two\rqueries")) {
+            assertThrows(IllegalArgumentException::class.java) { Inputs.normalize(value) }
+        }
+    }
+
     @Test fun filenamesRespectUtf8Boundary() {
         val output = FileNames.sanitize("😀".repeat(100))
         assertTrue(output.toByteArray().size <= 220)

@@ -135,11 +135,13 @@ object Inputs {
     private val url = Regex("https?://[^\\s<>]+")
 
     fun normalize(value: String): String {
-        val raw = url.find(value.trim())?.value ?: value.trim()
+        val trimmed = value.trim()
+        val raw = if (trimmed.startsWith("ytsearch1:")) trimmed else url.find(trimmed)?.value ?: trimmed
         require(raw.length in 1..4096) { "Empty or oversized input" }
         if (!raw.startsWith("http")) {
-            require(!raw.startsWith("-") && !raw.contains('\n')) { "Invalid search" }
-            return "ytsearch1:$raw"
+            val query = raw.removePrefix("ytsearch1:")
+            require(query.isNotBlank() && !query.startsWith("-") && query.none { it.isISOControl() }) { "Invalid search" }
+            return "ytsearch1:$query"
         }
         val parsed = URI(raw)
         require(parsed.scheme in listOf("https", "http") && !parsed.host.isNullOrBlank() && parsed.userInfo == null) { "Invalid URL" }
