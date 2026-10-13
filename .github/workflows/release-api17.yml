@@ -20,15 +20,8 @@ jobs:
           run-id: 38341299316
       - name: Enable KVM
         run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: '37.2'
-          target: google_apis_ps16k
-          arch: x86_64
-          profile: pixel_7_pro
-          ram-size: 4096M
-          disable-animations: true
-          script: bash scripts/check_release_startup.sh release-candidate/app-x86_64-release.apk
+      - name: Launch Android 17 after framework services become ready
+        run: bash scripts/check_android17_release.sh release-candidate/app-x86_64-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
