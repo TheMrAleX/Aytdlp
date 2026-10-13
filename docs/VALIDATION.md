@@ -75,3 +75,9 @@ Its first API 37 matrix job failed in SDK setup before app installation; this is
 Four v0.1.1 APKs were re-signed with the original v0.1.0 key; all signatures verify and the signer SHA-256 matches the fingerprint above. Every non-META-INF ZIP entry was compared against the tested optimized candidate and remained byte-for-byte identical. These APKs are delivered privately; v0.1.1 is not yet published on GitHub. Existing-key repository secrets are needed for automated publication; no private signing material is committed.
 
 The permanent publication workflow now builds/signs first, cold-starts the optimized release APK, and only then publishes it. The debug runtime/navigation gate remains separate. This correction does not establish physical ARM64 / Android 17 compatibility, live YouTube download, or the remaining product scope.
+
+
+## UI/runtime review — 2026-10-13
+Source d5dff56e0b05a76040abf8108ebd88d23577b2cb passed https://github.com/TheMrAleX/Aytdlp/actions/runs/38448972630 : 18 domain tests, six host process tests, four Android instrumented tests on API 35 / 16 KB, build, ktlint, detekt and native alignment audit. Android lint had zero errors and 20 warnings. The Android cancellation test now verifies canceling a silent real Python process and reusing its token; it initially exposed cancellation being misreported as an extraction error, which was corrected.
+
+The Preview package is isolated from production. Captures were visually inspected: download/error, queue, library and settings. Inspection identified system-bar icon contrast and capture timing issues; the final polish corrects both and adds vertical spacing between accent rows. The PR records the final follow-up CI result. This does not verify a real Android YouTube download, ARM64 physical-device behavior, optimized release/R8 behavior for this revision, or long-running transfers.

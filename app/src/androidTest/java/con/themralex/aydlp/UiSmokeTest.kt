@@ -15,6 +15,9 @@ class UiSmokeTest {
     private fun capture(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Compose idleness precedes SurfaceFlinger presenting the frame.
+        instrumentation.waitForIdleSync()
+        android.os.SystemClock.sleep(350)
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         File(instrumentation.targetContext.filesDir, "ui-$name.png").outputStream().use {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)

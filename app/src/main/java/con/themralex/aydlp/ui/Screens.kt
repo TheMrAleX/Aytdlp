@@ -372,7 +372,7 @@ import java.util.Locale
                                 query =
                                     it
                             }, tr("Search title or tags", "Buscar título o etiquetas"))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(tr("All", "Todo"), tr("Video", "Vídeo"), "Audio").forEachIndexed { index, name -> Chip(name, libraryFilter == index) { libraryFilter = index } }
                             }
                             if (hidden.isNotEmpty()) AyButton(tr("Undo delete", "Deshacer borrado"), primary = false) { vm.undoDelete() }
@@ -592,7 +592,7 @@ import java.util.Locale
                     Chip(tr("Close", "Cerrar"), onClick = onClose)
                 }
                 if (saved.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         saved.forEach { row ->
                             Chip(row.name) {
                                 vm.profile.value =
@@ -719,7 +719,7 @@ import java.util.Locale
         if (matches("Appearance Tema acento idioma")) {
             item {
                 SettingsGroup(tr("Appearance", "Apariencia"), initiallyExpanded = true, forceOpen = search.isNotBlank()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("dark", "light", "amoled").forEach { theme ->
                             Chip(
                                 when (theme) {
@@ -731,7 +731,7 @@ import java.util.Locale
                             ) { vm.text("theme", theme) }
                         }
                     }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Accents.forEachIndexed { index, color ->
                             Box(
                                 Modifier
