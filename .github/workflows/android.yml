@@ -57,6 +57,10 @@ jobs:
       - run: |
           python3 scripts/prepare_engine.py
           python3 scripts/prepare_native.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --ninja "$(command -v ninja)"
+      - name: Enable hardware acceleration for the emulator
+        run: |
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Native runtime and UI tests on 16 KB emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -65,11 +69,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            test "$(adb shell getconf PAGE_SIZE | tr -d '\r')" = 16384
-            ./gradlew connectedDebugAndroidTest --max-workers=2
-            mkdir -p screenshots
-            adb exec-out screencap -p > screenshots/device-16kb.png
+          script: bash scripts/run_device_tests.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -80,7 +80,7 @@ jobs:
             screenshots/
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify
+    needs: [verify, device_16kb]
     runs-on: ubuntu-latest
     permissions:
       contents: write
