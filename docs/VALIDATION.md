@@ -41,3 +41,21 @@ Resolved blockers: AndroidJUnit4 rejecting a non-void persistence test; repeated
 A universal development APK was rebuilt from this commit. It is a debug build, not a published signed production release. The earlier private signing key and release deliverables are not available in this workspace; preserve the existing signing identity and configure the owner-managed secrets for a production release.
 
 The remaining original functional scope listed above remains pending. Real Android YouTube extraction/download, real-media resume/merge integrity, reboot/network/OEM endurance, 6+ hour transfers and performance comparisons are not claimed verified by these tests.
+
+
+## Signed release publication 2026-10-13
+Published release: https://github.com/TheMrAleX/Aytdlp/releases/tag/v0.1.0
+Release source: 9cd60d74d94ac96ac411692a0cf1c002fc4c423e.
+Publication evidence: https://github.com/TheMrAleX/Aytdlp/actions/runs/38338855710
+Full quality/device workflow: https://github.com/TheMrAleX/Aytdlp/actions/runs/38338855775
+
+Four real release APKs (ARM64, ARMv7, x86_64, universal) were built with R8/resource shrinking and a newly generated RSA-4096 key authorized by the owner. All four passed APK v2 signature verification, SDK ZIP alignment and recursive ELF audits. SHA256SUMS.txt and per-APK native reports are published alongside the APKs.
+
+Signer certificate SHA-256:
+4a8f566760b23bba9ee3c27109b4d2c3b791dedcb52c74c1c87b832e35dbac4b
+
+The private signing backup was recovered from authenticated encrypted CMS, its JKS password/integrity was verified, and its certificate matched the published certificate. Only the encrypted backup and public certificate/fingerprint are published; the owner received the private backup separately. See docs/SIGNING.md for future release-secret setup.
+
+The first release attempt requested an unavailable testReleaseUnitTest task. The corrected command builds assembleRelease and lintRelease; mandatory domain tests run in the preceding verified quality gate. The publication retry checked that application/build inputs matched the successfully tested source. The temporary retry workflow is removed after successful publication.
+
+This resolves the production signing/publication blocker for v0.1.0. It does not resolve the remaining functional scope or unverified real-media/OEM/performance behavior listed above.
