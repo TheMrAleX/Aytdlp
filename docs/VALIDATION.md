@@ -59,3 +59,19 @@ The private signing backup was recovered from authenticated encrypted CMS, its J
 The first release attempt requested an unavailable testReleaseUnitTest task. The corrected command builds assembleRelease and lintRelease; mandatory domain tests run in the preceding verified quality gate. The publication retry checked that application/build inputs matched the successfully tested source. The temporary retry workflow is removed after successful publication.
 
 This resolves the production signing/publication blocker for v0.1.0. It does not resolve the remaining functional scope or unverified real-media/OEM/performance behavior listed above.
+
+
+## Release startup crash correction, 2026-10-13
+The published v0.1.0 optimized APK was **not** launched by the earlier debug instrumented tests. Its startup crash was reproduced directly from the published x86_64 APK on API 35 / 16 KB:
+https://github.com/TheMrAleX/Aytdlp/actions/runs/38340929153
+
+The log shows ExceptionInInitializerError in YoutubeDL.initPython -> ZipUtils.unzip, caused by a reflective ZIP extra-field implementation becoming non-concrete under R8. app/proguard-rules.pro now retains concrete ZipExtraField implementations and their public no-argument constructors, while still permitting name obfuscation. R8 and resource shrinking remain enabled.
+
+Candidate application source: 006a9f4eb8625d202def94156a412307c097190b.
+Optimized release compilation, lintRelease, signatures, ZIP/ELF audits and API 35 / 16 KB cold start succeeded:
+https://github.com/TheMrAleX/Aytdlp/actions/runs/38341299316
+Its first API 37 matrix job failed in SDK setup before app installation; this is not an app validation result. The subsequent API 37.2 attempt failed because the emulator reported boot complete before the input service was ready. A separate Android 17 test now waits for framework services and collects emulator/system logs. Android 17 validation is still pending at this checkpoint.
+
+Four v0.1.1 APKs were re-signed with the original v0.1.0 key; all signatures verify and the signer SHA-256 matches the fingerprint above. Every non-META-INF ZIP entry was compared against the tested optimized candidate and remained byte-for-byte identical. These APKs are delivered privately; v0.1.1 is not yet published on GitHub. Existing-key repository secrets are needed for automated publication; no private signing material is committed.
+
+The permanent publication workflow now builds/signs first, cold-starts the optimized release APK, and only then publishes it. The debug runtime/navigation gate remains separate. This correction does not establish physical ARM64 / Android 17 compatibility, live YouTube download, or the remaining product scope.

@@ -55,8 +55,8 @@ jobs:
         include:
           - api: 35
             target: google_apis_ps16k
-          - api: 37
-            target: google_apis
+          - api: '37.0'
+            target: google_apis_ps16k
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -66,6 +66,7 @@ jobs:
       - name: Enable KVM
         run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
+        if: matrix.api == 35
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
@@ -74,6 +75,9 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           script: bash scripts/check_release_startup.sh release-candidate/app-x86_64-release.apk
+      - name: Android 17 framework-ready startup
+        if: matrix.api == '37.0'
+        run: bash scripts/check_android17_release.sh release-candidate/app-x86_64-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
