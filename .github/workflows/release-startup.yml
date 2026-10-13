@@ -9,7 +9,15 @@ permissions:
 jobs:
   startup:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 35
+            target: google_apis_ps16k
+          - api: 37
+            target: google_apis
     steps:
       - uses: actions/checkout@v4
       - name: Download published release
@@ -18,14 +26,15 @@ jobs:
         run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis_ps16k
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_7_pro
+          ram-size: 4096M
           disable-animations: true
           script: bash scripts/check_release_startup.sh published-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: published-release-startup-evidence
+          name: published-release-startup-api-${{ matrix.api }}
           path: release-startup/
