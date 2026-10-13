@@ -6,10 +6,10 @@ capture_evidence() {
   local result=$?
   trap - EXIT
   adb logcat -d > screenshots/logcat.txt || true
-  adb shell am start -n con.themralex.aydlp/.ui.MainActivity > screenshots/launch.txt 2>&1 || true
+  adb shell am start -n con.themralex.aydlp.preview/con.themralex.aydlp.ui.MainActivity > screenshots/launch.txt 2>&1 || true
   adb exec-out screencap -p > screenshots/device-16kb.png || true
   for screen in download-dark analysis-error queue library settings-dark download-light; do
-    adb exec-out run-as con.themralex.aydlp cat "files/ui-$screen.png" > "screenshots/ui-$screen.png" || true
+    adb exec-out run-as con.themralex.aydlp.preview cat "files/ui-$screen.png" > "screenshots/ui-$screen.png" || true
   done
   exit "$result"
 }

@@ -27,7 +27,7 @@ class UiSmokeTest {
         compose.onNodeWithText("Analyze link").assertIsNotEnabled()
         capture("download-dark")
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("--invalid")
-        compose.onNodeWithText("Analyze link").performClick()
+        compose.onNodeWithText("Analyze link").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("We couldn't read this link").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("We couldn't read this link").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Copy report").assertExists()

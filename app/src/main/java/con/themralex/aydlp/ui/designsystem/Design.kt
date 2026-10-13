@@ -49,7 +49,13 @@ val LocalTokens =
     staticCompositionLocalOf {
         Tokens(Color(0xFF0B0D10), Color(0xFF14171C), Color(0xFF1C2027), Color(0xFFF3F5F7), Color(0xFF9DA6B4), Color(0xFF2A3039), Accents[0])
     }
-val Manrope = FontFamily(Font(R.font.manrope, FontWeight.Normal), Font(R.font.manrope, FontWeight.Bold))
+
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+val Manrope =
+    FontFamily(
+        Font(R.font.manrope, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+        Font(R.font.manrope, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    )
 
 @Composable fun AyTheme(
     theme: String,

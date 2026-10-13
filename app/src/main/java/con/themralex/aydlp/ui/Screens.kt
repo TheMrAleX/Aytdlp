@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,7 @@ import java.util.Locale
     battery: () -> Unit,
 ) {
     val context = LocalContext.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val hidden by vm.hiddenMedia.collectAsStateWithLifecycle()
     var editingMedia by remember { mutableStateOf<DownloadRow?>(null) }
     var editedName by remember { mutableStateOf("") }
@@ -158,7 +160,10 @@ import java.util.Locale
                                     Field(input, { input = it }, tr("Link or YouTube search", "Enlace o búsqueda en YouTube"), lines = 2, placeholder = "https://…")
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         AyButton(tr("Paste", "Pegar"), primary = false) { input = clipboard() }
-                                        AyButton(if (busy) tr("Analyzing…", "Analizando…") else tr("Analyze link", "Analizar enlace"), Modifier.weight(1f), enabled = input.isNotBlank() && !busy) { vm.analyze(input) }
+                                        AyButton(if (busy) tr("Analyzing…", "Analizando…") else tr("Analyze link", "Analizar enlace"), Modifier.weight(1f), enabled = input.isNotBlank() && !busy) {
+                                            keyboard?.hide()
+                                            vm.analyze(input)
+                                        }
                                     }
                                     if (busy) {
                                         LoadingBar()
@@ -182,7 +187,10 @@ import java.util.Locale
                                         Label(tr("Retry or copy the full report to investigate the cause.", "Reintenta o copia el informe completo para revisar la causa."), color = t.muted, size = 13)
                                         Label(analysisError, size = 12, maxLines = 4)
                                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            AyButton(tr("Retry", "Reintentar"), enabled = !busy) { vm.analyze(input) }
+                                            AyButton(tr("Retry", "Reintentar"), enabled = !busy) {
+                                                keyboard?.hide()
+                                                vm.analyze(input)
+                                            }
                                             AyButton(tr("Copy report", "Copiar informe"), primary = false) { copy(vm.diagnostic()) }
                                             AyButton(tr("Diagnostics", "Diagnóstico"), primary = false) { tab = 3 }
                                         }

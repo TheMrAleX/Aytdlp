@@ -37,6 +37,10 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
