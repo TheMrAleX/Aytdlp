@@ -119,6 +119,7 @@ import javax.inject.Singleton
                         }
                     }
                     val code = process.waitFor()
+                    currentCoroutineContext().ensureActive()
                     if (code != 0) error(Errors.redact(buffer.toString()).ifBlank { "Extractor exited with code $code without diagnostic output" })
                     buffer.toString()
                 } finally {
