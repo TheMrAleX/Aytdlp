@@ -1,0 +1,36 @@
+name: Android 17 optimized release startup
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-api17.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: optimized-release-candidate
+          path: release-candidate
+          github-token: ${{ github.token }}
+          run-id: 38341299316
+      - name: Enable KVM
+        run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: '37.2'
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_7_pro
+          ram-size: 4096M
+          disable-animations: true
+          script: bash scripts/check_release_startup.sh release-candidate/app-x86_64-release.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrected-release-android17-evidence
+          path: release-startup/

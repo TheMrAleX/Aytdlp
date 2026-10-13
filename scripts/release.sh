@@ -55,18 +55,7 @@ if test -f release-assets/signing-backup.cms; then
   (cd release-assets && sha256sum signing-backup.cms >> SHA256SUMS.txt)
 fi
 
-cat > release-notes.md <<'NOTES'
-Native Android release build with R8/resource shrinking and RSA signing. Minimum Android 8 (API 26). Download the ARM64 APK for a modern phone, or universal for all included ABIs.
-
-Checks: release compilation, domain unit tests, Android lint, apksigner, ZIP/ELF alignment; publication also requires the quality and Android 15 / 16 KB runtime, persistence and navigation gates.
-
-This initial release does not yet implement the entire original product specification. Real YouTube media download/resume, OEM endurance and comparative performance are not certified by these checks. See docs/VALIDATION.md and docs/MAINTENANCE.md.
-
-SHA256SUMS.txt contains artifact hashes. signing-certificate.pem and signing-fingerprint.txt identify the release signer. If present, signing-backup.cms is an authenticated encrypted backup; it contains no publicly readable signing credentials. The owner has the private recovery key.
-
-Future tags publish here automatically after their checks pass, using owner-managed AYTDLP_KEYSTORE_BASE64, AYTDLP_STORE_PASSWORD and AYTDLP_KEY_PASSWORD secrets. Keep the same signing identity for compatible app updates.
-NOTES
-
-gh release create "$RELEASE_TAG" release-assets/* --draft --target "$GITHUB_SHA" \
-  --title "Aytdlp ${AYTDLP_VERSION_NAME}" --notes-file release-notes.md
-gh release edit "$RELEASE_TAG" --draft=false --latest
+# CI runs a cold-start check of this optimized APK before publication.
+if test "${RELEASE_PUBLISH:-1}" = 1; then
+  bash scripts/publish_release.sh
+fi

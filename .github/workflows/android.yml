@@ -130,20 +130,44 @@ jobs:
         run: |
           python3 scripts/prepare_engine.py
           python3 scripts/prepare_native.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --ninja "$(command -v ninja)"
-      - name: Build, sign, verify and publish release
+      - name: Build, sign and verify release
         if: steps.release.outputs.needed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_PUBLISH: '0'
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           KEYSTORE_BASE64: ${{ secrets.AYTDLP_KEYSTORE_BASE64 }}
           AYTDLP_STORE_PASSWORD: ${{ secrets.AYTDLP_STORE_PASSWORD }}
           AYTDLP_KEY_PASSWORD: ${{ secrets.AYTDLP_KEY_PASSWORD }}
         run: bash scripts/release.sh
+      - name: Enable release emulator hardware acceleration
+        if: steps.release.outputs.needed == 'true'
+        run: sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+      - name: Cold-start optimized release before publication
+        if: steps.release.outputs.needed == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        with:
+          api-level: 35
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash scripts/check_release_startup.sh "release-assets/Aytdlp-${RELEASE_TAG#v}-x86_64.apk"
+      - name: Publish tested release
+        if: steps.release.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: bash scripts/publish_release.sh
       - uses: actions/upload-artifact@v4
         if: always() && steps.release.outputs.needed == 'true'
         with:
           name: aytdlp-release-and-reports
           path: |
             release-assets/
+            release-startup/
             app/build/reports/
