@@ -67,6 +67,16 @@ import java.util.Locale
     var showSchedule by rememberSaveable { mutableStateOf(false) }
     var showFormats by rememberSaveable { mutableStateOf(false) }
     var libraryFilter by rememberSaveable { mutableIntStateOf(0) }
+    val libraryRows =
+        remember(rows, hidden, query, libraryFilter) {
+            rows
+                .filter {
+                    it.state == DownloadState.COMPLETED &&
+                        it.id !in hidden &&
+                        (libraryFilter == 0 || ProfileJson.decode(it.profile).audio == (libraryFilter == 2)) &&
+                        (it.title.contains(query, true) || it.tag.contains(query, true))
+                }.sortedByDescending { it.created }
+        }
     val es = LocalConfiguration.current.locales[0].language == "es"
 
     fun tr(
@@ -358,24 +368,15 @@ import java.util.Locale
                                 listOf(tr("All", "Todo"), tr("Video", "Vídeo"), "Audio").forEachIndexed { index, name -> Chip(name, libraryFilter == index) { libraryFilter = index } }
                             }
                             if (hidden.isNotEmpty()) AyButton(tr("Undo delete", "Deshacer borrado"), primary = false) { vm.undoDelete() }
-                            if (rows.none {
-                                    it.state == DownloadState.COMPLETED
-                                }
-                            ) {
+                            if (libraryRows.isEmpty()) {
                                 Empty(
-                                    tr("Keep your first favorite.", "Guarda tu primer favorito."),
-                                    tr("Finished downloads appear here.", "Aquí aparecen las descargas completadas."),
+                                    if (query.isNotBlank() || libraryFilter != 0) tr("Nothing here yet", "Todavía no hay resultados") else tr("Keep your first favorite.", "Guarda tu primer favorito."),
+                                    if (query.isNotBlank() || libraryFilter != 0) tr("Try another search or filter.", "Prueba otra búsqueda o filtro.") else tr("Finished downloads appear here.", "Aquí aparecen las descargas completadas."),
                                 )
                             }
                             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                                 items(
-                                    rows
-                                        .filter {
-                                            it.state ==
-                                                DownloadState.COMPLETED && it.id !in hidden &&
-                                                (libraryFilter == 0 || ProfileJson.decode(it.profile).audio == (libraryFilter == 2)) &&
-                                                (it.title.contains(query, true) || it.tag.contains(query, true))
-                                        }.sortedByDescending { it.created },
+                                    libraryRows,
                                     key = { it.id },
                                 ) { row ->
                                     Panel {
@@ -405,7 +406,7 @@ import java.util.Locale
                     }
 
                     else -> {
-                        SettingsScreen(vm, es, folder, importCookies, exportBackup, restoreBackup, copy, language, battery, Modifier.weight(1f))
+                        SettingsScreen(vm, es, folder, importCookies, exportBackup, restoreBackup, copy, language, battery, Modifier.weight(1f), analysisError.isNotBlank() || health?.ready == false)
                     }
                 }
                 NavigationBar(tabs, tab, rows.count { it.state in StateMachine.active || it.state == DownloadState.QUEUED }) { tab = it }
@@ -688,6 +689,7 @@ import java.util.Locale
     language: (String) -> Unit,
     battery: () -> Unit,
     modifier: Modifier,
+    attention: Boolean,
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val h by vm.health.collectAsStateWithLifecycle()
@@ -708,8 +710,7 @@ import java.util.Locale
         }
         if (matches("Appearance Tema acento idioma")) {
             item {
-                Panel {
-                    Section(tr("Appearance", "Apariencia"))
+                SettingsGroup(tr("Appearance", "Apariencia"), initiallyExpanded = true, forceOpen = search.isNotBlank()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("dark", "light", "amoled").forEach { theme ->
                             Chip(
@@ -756,8 +757,7 @@ import java.util.Locale
         }
         if (matches("Queue Cola red wifi concurrencia")) {
             item {
-                Panel {
-                    Section(tr("Transfers", "Transferencias"))
+                SettingsGroup(tr("Transfers", "Transferencias"), initiallyExpanded = false, forceOpen = search.isNotBlank()) {
                     Label(tr("Simultaneous downloads", "Descargas simultáneas"), color = t.muted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         (1..6).forEach { n -> Chip(n.toString(), s.concurrency == n) { vm.number("concurrency", n) } }
@@ -793,8 +793,7 @@ import java.util.Locale
         }
         if (matches("Storage Almacenamiento carpeta plantilla")) {
             item {
-                Panel {
-                    Section(tr("Storage", "Almacenamiento"))
+                SettingsGroup(tr("Storage", "Almacenamiento"), initiallyExpanded = false, forceOpen = search.isNotBlank()) {
                     Label(
                         if (s.destination.isBlank()) {
                             tr(
@@ -814,8 +813,7 @@ import java.util.Locale
         }
         if (matches("Engine Motor YouTube proxy user agent clientes cookies")) {
             item {
-                Panel {
-                    Section(tr("Engine", "Motor"))
+                SettingsGroup(tr("Engine", "Motor"), initiallyExpanded = false, forceOpen = search.isNotBlank()) {
                     SettingField(vm, "clients", s.clients, tr("YouTube client chain", "Cadena de clientes YouTube"))
                     SettingField(vm, "proxy", s.proxy, "Proxy")
                     SettingField(vm, "userAgent", s.userAgent, "User-Agent")
@@ -840,8 +838,7 @@ import java.util.Locale
         }
         if (matches("Updates Actualización diagnóstico")) {
             item {
-                Panel {
-                    Section(tr("Maintenance", "Mantenimiento"))
+                SettingsGroup(tr("Maintenance", "Mantenimiento"), initiallyExpanded = false, forceOpen = search.isNotBlank() || attention) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("stable", "nightly", "master").forEach { channel ->
                             Chip(
@@ -892,8 +889,7 @@ import java.util.Locale
         }
         if (matches("Backup Respaldo exportar importar")) {
             item {
-                Panel {
-                    Section(tr("Backup", "Respaldo"))
+                SettingsGroup(tr("Backup", "Respaldo"), initiallyExpanded = false, forceOpen = search.isNotBlank()) {
                     AyButton(tr("Export settings and queue", "Exportar ajustes y cola"), primary = false, onClick = exportBackup)
                     AyButton(tr("Restore backup", "Restaurar respaldo"), primary = false, onClick = restoreBackup)
                 }
@@ -995,3 +991,19 @@ private fun stateLabel(
         DownloadState.FAILED -> if (es) "Necesita atención" else "Needs attention"
         DownloadState.CANCELED -> if (es) "Cancelada" else "Canceled"
     }
+
+@Composable private fun SettingsGroup(
+    title: String,
+    initiallyExpanded: Boolean = false,
+    forceOpen: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
+    Panel(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp).clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
+            Label(title, Modifier.weight(1f), size = 20, bold = true)
+            Label(if (expanded || forceOpen) "−" else "+", size = 24, color = LocalTokens.current.muted)
+        }
+        if (expanded || forceOpen) content()
+    }
+}

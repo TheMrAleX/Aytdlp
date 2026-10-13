@@ -119,7 +119,7 @@ import javax.inject.Singleton
                         }
                     }
                     val code = process.waitFor()
-                    if (code != 0) error(Errors.redact(buffer.toString()))
+                    if (code != 0) error(Errors.redact(buffer.toString()).ifBlank { "Extractor exited with code $code without diagnostic output" })
                     buffer.toString()
                 } finally {
                     withContext(NonCancellable) {
@@ -347,7 +347,7 @@ import javax.inject.Singleton
                 args += listOf("--limit-rate", s.rate)
             }
             if (profile.audio) {
-                args += listOf("-f", "bestaudio/best", "-x", "--audio-format", profile.container, "--audio-quality", "${profile.bitrate}K")
+                args += listOf("-f", profile.formatId.ifBlank { "bestaudio/best" }, "-x", "--audio-format", profile.container, "--audio-quality", "${profile.bitrate}K")
             } else {
                 val codec = if (profile.codec.isBlank()) "" else "[vcodec^=${profile.codec}]"
                 args +=
