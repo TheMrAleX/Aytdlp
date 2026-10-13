@@ -1,0 +1,59 @@
+name: Publish initial signed release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-retry.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: aytdlp-publication
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VALIDATED_SOURCE: bc2da38b2490249e714c412da682f940bee838bb
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify unchanged application and successful quality gates
+        run: |
+          test "$(gh api "repos/$GH_REPO/actions/runs/38337531279" --jq .head_sha)" = "$VALIDATED_SOURCE"
+          test "$(gh api "repos/$GH_REPO/actions/runs/38337531279/jobs" --jq '[.jobs[] | select(.name == "verify" or .name == "device_16kb") | select(.conclusion == "success")] | length')" = 2
+          git diff --name-only "$VALIDATED_SOURCE" HEAD > /tmp/release-changes.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          allowed = {'.github/workflows/release-retry.yml', '.github/workflows/android.yml', 'scripts/release.sh', 'docs/SIGNING.md'}
+          changed = set(Path('/tmp/release-changes.txt').read_text().splitlines())
+          assert changed <= allowed, 'Application/build inputs changed; repeat the full quality gates'
+          PY
+          if gh release view v0.1.0 > /dev/null 2>&1; then echo 'Release already exists'; exit 1; fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+      - run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0' 'ndk;28.2.13676358'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: |
+          python3 scripts/prepare_engine.py
+          python3 scripts/prepare_native.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --ninja "$(command -v ninja)"
+      - name: Build, sign, verify and publish
+        env:
+          RELEASE_TAG: v0.1.0
+          KEYSTORE_BASE64: ${{ secrets.AYTDLP_KEYSTORE_BASE64 }}
+          AYTDLP_STORE_PASSWORD: ${{ secrets.AYTDLP_STORE_PASSWORD }}
+          AYTDLP_KEY_PASSWORD: ${{ secrets.AYTDLP_KEY_PASSWORD }}
+        run: bash scripts/release.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aytdlp-initial-release-evidence
+          path: |
+            release-assets/
+            app/build/reports/

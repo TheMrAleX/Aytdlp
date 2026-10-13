@@ -19,7 +19,7 @@ Configure repository Actions secrets from the retained backup:
 - `AYTDLP_STORE_PASSWORD`: its store password from `signing.json`.
 - `AYTDLP_KEY_PASSWORD`: its key password from `signing.json`.
 
-The alias is `aytdlp`. Create a `vMAJOR.MINOR.PATCH` tag or use the workflow's `release_tag` input. VersionName comes from the tag and VersionCode is `major * 1000000 + minor * 1000 + patch` (minor and patch below 1000). Quality checks, the 16 KB device gate, release unit tests/lint, signatures and ZIP/ELF audits must pass before publication. An existing release is left unchanged; failed builds do not publish an unsigned APK.
+The alias is `aytdlp`. Create a `vMAJOR.MINOR.PATCH` tag or use the workflow's `release_tag` input. VersionName comes from the tag and VersionCode is `major * 1000000 + minor * 1000 + patch` (minor and patch below 1000). Quality checks, the 16 KB device gate, unit tests and release lint, signatures and ZIP/ELF audits must pass before publication. An existing release is left unchanged; failed builds do not publish an unsigned APK.
 
 Changing to an unrelated signing key normally requires uninstalling the previous app. Android key-rotation mechanisms require the old key and additional configuration; this workflow does not create a rotation lineage. Preserve the initial key if compatible updates are desired.
 

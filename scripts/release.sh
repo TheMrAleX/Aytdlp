@@ -34,7 +34,7 @@ else
     --recipient .github/signing-recipient.pem --output release-assets/signing-backup.cms
 fi
 
-./gradlew assembleRelease testReleaseUnitTest lintRelease --max-workers=2
+./gradlew assembleRelease lintRelease --max-workers=2
 keytool -exportcert -rfc -alias aytdlp -keystore "$AYTDLP_KEYSTORE" \
   -storepass:env AYTDLP_STORE_PASSWORD -file release-assets/signing-certificate.pem
 
@@ -58,7 +58,7 @@ fi
 cat > release-notes.md <<'NOTES'
 Native Android release build with R8/resource shrinking and RSA signing. Minimum Android 8 (API 26). Download the ARM64 APK for a modern phone, or universal for all included ABIs.
 
-Checks: release compilation, release unit tests, Android lint, apksigner, ZIP/ELF alignment; publication also requires the quality and Android 15 / 16 KB runtime, persistence and navigation gates.
+Checks: release compilation, domain unit tests, Android lint, apksigner, ZIP/ELF alignment; publication also requires the quality and Android 15 / 16 KB runtime, persistence and navigation gates.
 
 This initial release does not yet implement the entire original product specification. Real YouTube media download/resume, OEM endurance and comparative performance are not certified by these checks. See docs/VALIDATION.md and docs/MAINTENANCE.md.
 

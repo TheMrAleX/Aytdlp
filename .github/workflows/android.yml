@@ -88,6 +88,9 @@ jobs:
     needs: [verify, device_16kb]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      group: aytdlp-publication
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
