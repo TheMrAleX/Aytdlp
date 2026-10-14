@@ -6,13 +6,35 @@ import androidx.test.platform.app.InstrumentationRegistry
 import con.themralex.aydlp.core.background
 import con.themralex.aydlp.data.AppDatabase
 import con.themralex.aydlp.data.DownloadRow
-import kotlinx.coroutines.runBlocking
+import con.themralex.aydlp.data.NativeEngine
+import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class RuntimeTest {
+    @Test fun cancelSilentExtractorReleasesProcess(): Unit =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val engine = background(context).engine() as NativeEngine
+            val fixture = File(context.noBackupFilesDir, "silent-fixture.py")
+            fixture.writeText("import time\nprint('READY', flush=True)\ntime.sleep(60)\n")
+            val ready = CompletableDeferred<Unit>()
+            try {
+                val job = launch { engine.run("cancel-test", emptyList(), fixture) { if (it == "READY") ready.complete(Unit) } }
+                withTimeout(15000) { ready.await() }
+                withTimeout(5000) { job.cancelAndJoin() }
+                assertFalse(File(context.noBackupFilesDir, "pid-cancel-test").exists())
+                // Token reuse proves cancellation completed and bookkeeping was released.
+                assertTrue(engine.run("cancel-test", listOf("--version")).isNotBlank())
+            } finally {
+                engine.stop("cancel-test")
+                fixture.delete()
+            }
+        }
+
     @Test fun databasePersistsAcrossReopen(): Unit =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext

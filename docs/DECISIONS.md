@@ -41,3 +41,7 @@ Host yt-dlp 2026.08.19 with Node extracted jNQXAC9IVRw: 16 formats and 16 direct
 
 ## Final build evidence
 A clean real release build succeeded with R8/resource shrinking and RSA-4096 signing. Four ABI/universal APKs passed signature, SDK ZIP alignment and recursive ELF checks; 14 compiled domain tests passed via JUnitCore, with two separate host fault-fixture tests. ktlint and detekt passed; lintRelease reports 0 errors, 18 warnings. A prior multi-build invocation collided on Gradle PID/cache locks in this isolated environment; final builds ran sequentially after clean. The GitHub App connection cannot write repository secrets; signed tag publication remains gated on owner setup. No release was fabricated or published unsigned.
+
+
+## 2026-10-13: revisión del supervisor y UI
+La supervisión del proceso usa el pipe de ProcessBuilder, no una lectura obligatoria de /proc del padre. El vigilante es el único lector y el extractor recibe /dev/null. Se prueba denegación de /proc, cierre del propietario y cancelación silenciosa. Los builds debug se aíslan en el applicationId .preview para probar cambios sin desinstalar producción. Véase REVIEW.md para alcance, riesgos y decisiones de diseño.

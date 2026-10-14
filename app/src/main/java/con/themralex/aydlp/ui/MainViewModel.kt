@@ -53,9 +53,12 @@ import javax.inject.Inject
         val info = MutableStateFlow<MediaInfo?>(null)
         val busy = MutableStateFlow(false)
         val message = MutableStateFlow("")
+        val analysisError = MutableStateFlow("")
+        private val lastAnalysisReport = MutableStateFlow("")
         val health = MutableStateFlow<EngineHealth?>(null)
         val profile = MutableStateFlow(Profile())
         private var analysis: Job? = null
+        private var analysisToken = "preview"
         private val cache = LinkedHashMap<String, Pair<Long, MediaInfo>>()
 
         init {
@@ -79,11 +82,19 @@ import javax.inject.Inject
         }
 
         fun analyze(input: String) {
-            analysis?.cancel()
+            val previousToken = analysisToken
+            val token = "preview-${java.util.UUID.randomUUID()}"
+            analysisToken = token
+            val previous = analysis
+            previous?.cancel()
             analysis =
                 viewModelScope.launch {
+                    engine.stop(previousToken)
+                    previous?.join()
                     busy.value = true
                     info.value = null
+                    profile.value = profile.value.copy(formatId = "")
+                    analysisError.value = ""
                     try {
                         val key = Inputs.normalize(input)
                         val hit = cache[key]
@@ -94,7 +105,7 @@ import javax.inject.Inject
                             ) {
                                 hit.second
                             } else {
-                                engine.analyze(key, "preview")
+                                engine.analyze(key, token)
                             }
                         info.value = value
                         cache[key] =
@@ -107,8 +118,13 @@ import javax.inject.Inject
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        message.value =
-                            Errors.classify(e.message.orEmpty()).action + "\n" + Errors.redact(e.message.orEmpty()).takeLast(300)
+                        lastAnalysisReport.value = Errors.redact(e.stackTraceToString())
+                        analysisError.value =
+                            Errors
+                                .redact(e.message.orEmpty())
+                                .lineSequence()
+                                .lastOrNull { it.isNotBlank() }
+                                .orEmpty()
                     } finally {
                         busy.value =
                             false
@@ -117,7 +133,8 @@ import javax.inject.Inject
         }
 
         fun cancelAnalysis() {
-            action { engine.stop("preview") }
+            val token = analysisToken
+            action { engine.stop(token) }
             analysis?.cancel()
             busy.value = false
         }
@@ -137,7 +154,14 @@ import javax.inject.Inject
         suspend fun enqueue(
             input: String,
             schedule: Long = 0,
-        ): String = queue.enqueue(input, profile.value, schedule)
+        ): String {
+            val normalized = Inputs.normalize(input)
+            val selected =
+                info.value?.let { media ->
+                    if (Inputs.normalize(media.url) == normalized) media else media.entries.firstOrNull { Inputs.normalize(it.url) == normalized }
+                }
+            return queue.enqueue(input, profile.value, schedule, info = selected)
+        }
 
         fun text(
             key: String,
@@ -169,7 +193,7 @@ import javax.inject.Inject
         fun diagnostic(): String {
             val h = health.value
             return Errors.redact(
-                "Aytdlp ${con.themralex.aydlp.BuildConfig.VERSION_NAME}\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLive extraction has not been proven by the runtime self-test.",
+                "Aytdlp ${con.themralex.aydlp.BuildConfig.VERSION_NAME}\nAndroid ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}\nABI ${android.os.Build.SUPPORTED_ABIS.joinToString()}\nyt-dlp: ${h?.version}\nJS: ${h?.runtime}\nEJS: ${h?.solver}\nFFmpeg: ${h?.ffmpeg}\nClient chain: ${settings.value.clients}\nHealth: ${h?.detail}\nUpdate: ${settings.value.updateReport}\nLast analysis error:\n${lastAnalysisReport.value}\nLive extraction has not been proven by the runtime self-test.",
             )
         }
     }

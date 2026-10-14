@@ -129,6 +129,26 @@ import kotlinx.coroutines.*
                         withContext(Dispatchers.Main) { Transfers.start(this@MainActivity, true) }
                     }
                 },
+                locateDownloads = {
+                    runCatching {
+                        val destination = vm.settings.value.destination
+                        val intent =
+                            if (destination.isBlank()) {
+                                Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
+                            } else {
+                                val tree = Uri.parse(destination)
+                                val document = android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, android.provider.DocumentsContract.getTreeDocumentId(tree))
+                                Intent(Intent.ACTION_VIEW).setDataAndType(document, "vnd.android.document/directory").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                        startActivity(intent)
+                    }.onFailure { vm.message.value = it.message.orEmpty() }
+                },
+                resumeDownload = { id ->
+                    vm.action {
+                        vm.queue.resume(id)
+                        withContext(Dispatchers.Main) { Transfers.start(this@MainActivity, true) }
+                    }
+                },
                 importLinks = {
                     imports.launch(arrayOf("text/plain"))
                 },
@@ -154,18 +174,6 @@ import kotlinx.coroutines.*
                 language = ::updateLanguage,
                 battery = { startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) },
             )
-        }
-    }
-
-    private var lastClipboardNotice = 0L
-
-    override fun onResume() {
-        super.onResume()
-        val clipboard = getSystemService(ClipboardManager::class.java)
-        val description = clipboard.primaryClipDescription
-        if (description != null && description.timestamp != lastClipboardNotice && description.hasMimeType("text/plain")) {
-            lastClipboardNotice = description.timestamp
-            vm.message.value = "Clipboard text available · use Paste / Texto en portapapeles · pulsa Pegar"
         }
     }
 

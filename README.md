@@ -15,6 +15,9 @@ Native Kotlin / Compose downloader built around yt-dlp, FFmpeg and QuickJS. Pack
 - Custom foundation-based Compose components, Manrope font, dark/light/AMOLED themes, eight accents, English/Spanish.
 - Keystore-encrypted cookies, verified staged yt-dlp updates with smoke test and retained fallback, redacted diagnostics and settings/queue backups.
 
+## UI and runtime refresh
+See [review and scope](docs/REVIEW.md). Debug APKs install as **Aytdlp Preview** alongside the existing app with separate data; do not uninstall your production app to test the preview. Release signing and package identity remain unchanged.
+
 ## Build
 Install JDK 21, Android SDK platform 37.2, build tools 37.0.0, NDK 28.2.13676358, CMake and Ninja.
 

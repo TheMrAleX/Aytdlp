@@ -23,4 +23,4 @@ The alias is `aytdlp`. Create a `vMAJOR.MINOR.PATCH` tag or use the workflow's `
 
 Changing to an unrelated signing key normally requires uninstalling the previous app. Android key-rotation mechanisms require the old key and additional configuration; this workflow does not create a rotation lineage. Preserve the initial key if compatible updates are desired.
 
-Main-branch pushes bootstrap only the initial release. They do not publish a new version on every commit. Subsequent versions appear automatically from version tags with the signing secrets configured.
+Main-branch pushes currently publish `v0.1.1` when it does not yet exist. They do not publish a new version on every commit. Subsequent versions appear automatically from version tags with the signing secrets configured.
