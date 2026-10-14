@@ -75,7 +75,8 @@ import java.util.Locale
         remember(rows, hidden, query, libraryFilter) {
             rows
                 .filter {
-                    it.state == DownloadState.COMPLETED && it.id !in hidden &&
+                    it.state == DownloadState.COMPLETED &&
+                        it.id !in hidden &&
                         (libraryFilter == 0 || ProfileJson.decode(it.profile).audio == (libraryFilter == 2)) &&
                         (it.title.contains(query, true) || it.tag.contains(query, true))
                 }.sortedByDescending { it.created }
