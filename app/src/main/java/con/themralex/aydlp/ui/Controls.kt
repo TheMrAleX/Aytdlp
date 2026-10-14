@@ -187,41 +187,79 @@ import con.themralex.aydlp.ui.designsystem.*
 ) {
     val t = LocalTokens.current
     val icons = listOf("download", "queue", "library", "settings")
-    Row(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(30.dp))
             .background(t.surface)
+            .border(1.dp, t.border.copy(alpha = 0.5f), RoundedCornerShape(30.dp))
             .selectableGroup()
             .padding(6.dp),
     ) {
-        tabs.forEachIndexed { index, title ->
-            val active = index == selected
-            val background by animateColorAsState(if (active) t.accent.copy(alpha = 0.14f) else Color.Transparent, label = "tab")
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(background)
-                    .selectable(selected = active, role = Role.Tab) { onSelect(index) }
-                    .padding(vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Box {
-                    ControlIcon(icons[index], if (active) t.accent else t.muted)
-                    if (index == 1 && queueCount > 0) {
-                        Box(
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 8.dp, y = (-4).dp)
-                                .size(8.dp)
-                                .background(t.accent, RoundedCornerShape(8.dp)),
-                        )
+        val slot = maxWidth / tabs.size
+        val indicator by animateDpAsState(slot * selected, spring(dampingRatio = 0.85f, stiffness = 380f), label = "dockIndicator")
+        Box(
+            Modifier
+                .offset(x = indicator)
+                .width(slot)
+                .height(60.dp)
+                .background(t.accent.copy(alpha = 0.14f), RoundedCornerShape(24.dp)),
+        )
+        Row(Modifier.fillMaxWidth()) {
+            tabs.forEachIndexed { index, title ->
+                val active = index == selected
+                val color by animateColorAsState(if (active) t.accent else t.muted, label = "dockIcon")
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .selectable(selected = active, role = Role.Tab) { onSelect(index) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                ) {
+                    Box {
+                        ControlIcon(icons[index], color)
+                        if (index == 1 && queueCount > 0) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 10.dp, y = (-5).dp)
+                                    .background(t.accent, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 4.dp),
+                            ) {
+                                Label(if (queueCount > 99) "99+" else "$queueCount", size = 9, bold = true, color = t.background)
+                            }
+                        }
                     }
+                    Label(title, size = 10, bold = active, color = color, maxLines = 1)
                 }
-                Label(title, size = 10, bold = active, color = if (active) t.accent else t.muted, maxLines = 1)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun QualityPresets(
+    profile: Profile,
+    es: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    if (profile.audio) {
+        Label("${profile.bitrate} kbps", color = LocalTokens.current.accent)
+    } else {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(0, 360, 480, 720, 1080, 1440, 2160).forEach { resolution ->
+                Chip(
+                    if (resolution == 0) {
+                        if (es) "Mejor" else "Best"
+                    } else {
+                        "${resolution}p"
+                    },
+                    profile.resolution == resolution,
+                ) { onSelect(resolution) }
             }
         }
     }
@@ -248,7 +286,7 @@ import con.themralex.aydlp.ui.designsystem.*
     }
 }
 
-internal fun profileSummary(profile: Profile): String = if (profile.audio) "Audio · ${profile.bitrate} kbps · ${profile.container.uppercase()}" else "${profile.resolution}p · ${profile.container.uppercase()}${if (profile.formatId.isNotBlank()) " · Manual" else ""}"
+internal fun profileSummary(profile: Profile): String = if (profile.audio) "Audio · ${profile.bitrate} kbps · ${profile.container.uppercase()}" else "${if (profile.resolution == 0) "Auto" else "${profile.resolution}p"} · ${profile.container.uppercase()}${if (profile.formatId.isNotBlank()) " · Manual" else ""}"
 
 internal fun downloadStateLabel(
     state: DownloadState,

@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths: ['app/proguard-rules.pro', '.github/workflows/release-regression.yml']
+  pull_request:
+    paths: ['app/**', '.github/workflows/release-regression.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,8 +30,8 @@ jobs:
           export AYTDLP_STORE_PASSWORD="$(openssl rand -hex 32)"
           export AYTDLP_KEY_PASSWORD="$AYTDLP_STORE_PASSWORD"
           echo "::add-mask::$AYTDLP_STORE_PASSWORD"
-          export AYTDLP_VERSION_NAME=0.1.1
-          export AYTDLP_VERSION_CODE=1001
+          export AYTDLP_VERSION_NAME=0.1.2
+          export AYTDLP_VERSION_CODE=1002
           keytool -genkeypair -alias aytdlp -keyalg RSA -keysize 4096 -validity 365 -storetype JKS -keystore "$AYTDLP_KEYSTORE" -storepass:env AYTDLP_STORE_PASSWORD -keypass:env AYTDLP_KEY_PASSWORD -dname 'CN=CI release regression'
           ./gradlew assembleRelease lintRelease --max-workers=2
           mkdir -p release-candidate

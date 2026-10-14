@@ -139,6 +139,10 @@ object Transfers {
     ) {
         if (active) return
         val s = background(context).settings().get()
+        if (userInitiated && !s.wifi && !s.charging) {
+            ContextCompat.startForegroundService(context, Intent(context, TransferService::class.java))
+            return
+        }
         if (Build.VERSION.SDK_INT >= 34) {
             val network =
                 NetworkRequest
@@ -297,8 +301,12 @@ object Transfers {
                 try {
                     queue.drain { n.update(it) }
                 } finally {
-                    Transfers.detached()
-                    stopSelf()
+                    withContext(NonCancellable) {
+                        Transfers.detached()
+                        val pending = queue.dao.all().filter { it.state == DownloadState.SCHEDULED || it.state == DownloadState.QUEUED }
+                        pending.minOfOrNull { it.scheduled }?.let { Transfers.wake(this@TransferService, it - System.currentTimeMillis()) }
+                        stopSelf(startId)
+                    }
                 }
             }
         return START_NOT_STICKY

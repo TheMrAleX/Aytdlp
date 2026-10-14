@@ -29,6 +29,7 @@ import coil3.compose.AsyncImage
 import con.themralex.aydlp.data.*
 import con.themralex.aydlp.domain.*
 import con.themralex.aydlp.ui.designsystem.*
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -60,6 +61,7 @@ import java.util.Locale
     val rows by vm.downloads.collectAsStateWithLifecycle()
     val info by vm.info.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val queueingAnalysis by vm.queueingAnalysis.collectAsStateWithLifecycle()
     val analysisError by vm.analysisError.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val health by vm.health.collectAsStateWithLifecycle()
@@ -125,7 +127,9 @@ import java.util.Locale
                 targetState = tab,
                 modifier = Modifier.weight(1f),
                 transitionSpec = {
-                    (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 20 }) togetherWith fadeOut(tween(140))
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(300)) { direction * it } + fadeIn(tween(240))) togetherWith
+                        (slideOutHorizontally(tween(300)) { -direction * it } + fadeOut(tween(240)))
                 },
                 label = "screen",
             ) { screen ->
@@ -169,6 +173,16 @@ import java.util.Locale
                                         }
                                     }
                                     if (busy) {
+                                        item {
+                                            Panel(Modifier.fillMaxWidth()) {
+                                                Label(tr("Quality", "Calidad"), bold = true)
+                                                QualityPresets(profile, es) { resolution -> vm.edit { it.copy(resolution = resolution, formatId = "") } }
+                                                AyButton(tr("Add to queue", "Añadir a la cola"), Modifier.fillMaxWidth(), enabled = !queueingAnalysis) {
+                                                    enqueue(vm.analysisInput, 0)
+                                                    tab = 1
+                                                }
+                                            }
+                                        }
                                         item { AnalysisSkeleton(tr("Cancel", "Cancelar"), vm::cancelAnalysis) }
                                     } else if (info != null) {
                                         val media = info!!
@@ -241,6 +255,21 @@ import java.util.Locale
                         }
                         1 -> {
                             val transfers = rows.filter { it.state !in setOf(DownloadState.COMPLETED, DownloadState.CANCELED) }
+                            val waiting by produceState("", settings.wifi, settings.charging, transfers.any { it.state == DownloadState.QUEUED }) {
+                                while (transfers.any { it.state == DownloadState.QUEUED }) {
+                                    val manager = context.getSystemService(android.net.ConnectivityManager::class.java)
+                                    val network = manager.getNetworkCapabilities(manager.activeNetwork)
+                                    val batteryManager = context.getSystemService(android.os.BatteryManager::class.java)
+                                    value =
+                                        when {
+                                            network?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) != true -> tr("Waiting for network", "Esperando conexión")
+                                            settings.wifi && (network.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) != true || !network.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) -> tr("Waiting for unmetered Wi-Fi", "Esperando Wi-Fi sin límite")
+                                            settings.charging && !batteryManager.isCharging -> tr("Waiting for charger", "Esperando cargador")
+                                            else -> ""
+                                        }
+                                    delay(2000)
+                                }
+                            }
                             Box(Modifier.weight(1f)) {
                                 Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -248,12 +277,19 @@ import java.util.Locale
                                         IconAction("play", tr("Resume all", "Reanudar todas"), onClick = startQueue)
                                         IconAction("pause", tr("Pause all", "Pausar todas")) { vm.action { vm.queue.pauseAll() } }
                                     }
-                                    if (transfers.isEmpty()) {
+                                    if (queueingAnalysis) {
+                                        Panel(Modifier.fillMaxWidth()) {
+                                            Label(tr("Analyzing", "Analizando"), color = t.accent)
+                                            LoadingBar()
+                                            TextAction(tr("Cancel", "Cancelar"), vm::cancelAnalysis)
+                                        }
+                                    }
+                                    if (transfers.isEmpty() && !queueingAnalysis) {
                                         Empty(tr("Queue empty", "Cola vacía"), tr("Add a link to download.", "Añade un enlace para descargar."))
                                     }
                                     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 100.dp)) {
                                         items(transfers, key = { it.id }) { row ->
-                                            DownloadCard(row, es, onPause = { vm.action { vm.queue.pause(row.id) } }, onResume = {
+                                            DownloadCard(row, es, waiting, onPause = { vm.action { vm.queue.pause(row.id) } }, onResume = {
                                                 resumeDownload(row.id)
                                             }, onCancel = { vm.action { vm.queue.cancel(row.id) } }, onEdit = {
                                                 editingDownload = row.id
@@ -409,6 +445,7 @@ import java.util.Locale
 @Composable private fun DownloadCard(
     row: DownloadRow,
     es: Boolean,
+    waiting: String,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
@@ -421,7 +458,7 @@ import java.util.Locale
             Column(Modifier.weight(1f)) {
                 Label(row.title.ifBlank { row.url }, bold = true, maxLines = 2)
                 Label(
-                    downloadStateLabel(row.state, es),
+                    if (row.state == DownloadState.QUEUED && waiting.isNotBlank()) waiting else downloadStateLabel(row.state, es),
                     size = 11,
                     color =
                         if (row.state ==
@@ -514,9 +551,9 @@ import java.util.Locale
                 if (!p.audio) {
                     Label(tr("Maximum resolution", "Resolución máxima"), color = t.muted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(360, 480, 720, 1080, 1440, 2160, 4320).forEach { r ->
+                        listOf(0, 360, 480, 720, 1080, 1440, 2160, 4320).forEach { r ->
                             Chip(
-                                "${r}p",
+                                if (r == 0) tr("Best", "Mejor") else "${r}p",
                                 p.resolution == r,
                             ) { vm.edit { it.copy(resolution = r, formatId = "") } }
                         }

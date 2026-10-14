@@ -57,6 +57,9 @@ import javax.inject.Inject
         private val lastAnalysisReport = MutableStateFlow("")
         val health = MutableStateFlow<EngineHealth?>(null)
         val profile = MutableStateFlow(Profile())
+        val queueingAnalysis = MutableStateFlow(false)
+        var analysisInput = ""
+            private set
         private var analysis: Job? = null
         private var analysisToken = "preview"
         private val cache = LinkedHashMap<String, Pair<Long, MediaInfo>>()
@@ -82,6 +85,7 @@ import javax.inject.Inject
         }
 
         fun analyze(input: String) {
+            analysisInput = input
             val previousToken = analysisToken
             val token = "preview-${java.util.UUID.randomUUID()}"
             analysisToken = token
@@ -154,13 +158,24 @@ import javax.inject.Inject
         suspend fun enqueue(
             input: String,
             schedule: Long = 0,
+            selectedProfile: Profile = profile.value,
         ): String {
             val normalized = Inputs.normalize(input)
+            val pending = analysis
+            if (busy.value && Inputs.normalize(analysisInput) == normalized) {
+                queueingAnalysis.value = true
+                try {
+                    pending?.join()
+                    check(info.value != null) { analysisError.value.ifBlank { "Analysis canceled" } }
+                } finally {
+                    queueingAnalysis.value = false
+                }
+            }
             val selected =
                 info.value?.let { media ->
-                    if (Inputs.normalize(media.url) == normalized) media else media.entries.firstOrNull { Inputs.normalize(it.url) == normalized }
+                    if (Inputs.normalize(media.url) == normalized || (analysisInput.isNotBlank() && Inputs.normalize(analysisInput) == normalized && media.entries.isEmpty())) media else media.entries.firstOrNull { Inputs.normalize(it.url) == normalized }
                 }
-            return queue.enqueue(input, profile.value, schedule, info = selected)
+            return queue.enqueue(selected?.url ?: input, selectedProfile, schedule, info = selected)
         }
 
         fun text(
