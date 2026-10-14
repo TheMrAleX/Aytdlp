@@ -399,7 +399,7 @@ import java.util.Locale
         ProgressBar(row.progress)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Label("${row.progress.toInt()}% · ${bytes(row.bytes)}", size = 12)
-            Label("${bytes(row.speed.toLong())}/s · ${duration(row.eta)}", size = 12, color = t.muted)
+            if (row.state == DownloadState.DOWNLOADING) Label("${bytes(row.speed.toLong())}/s · ${duration(row.eta)}", size = 12, color = t.muted)
         }
         if (row.fragments >
             0

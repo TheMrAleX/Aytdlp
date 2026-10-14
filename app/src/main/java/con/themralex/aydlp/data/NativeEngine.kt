@@ -263,6 +263,19 @@ import javax.inject.Singleton
                 }
             }
 
+        private fun saveMetadata(
+            target: File,
+            raw: String,
+        ) {
+            val pending = File.createTempFile("metadata-", ".tmp", target.parentFile)
+            try {
+                pending.writeText(raw)
+                check(pending.renameTo(target)) { "Cannot save metadata" }
+            } finally {
+                pending.delete()
+            }
+        }
+
         private fun metadataFile(
             input: String,
             options: List<String>,
@@ -409,7 +422,10 @@ import javax.inject.Singleton
             args += AdvancedArguments.parse(profile.custom)
             val cookie = cookies.materialize(directory)
             if (cookie != null) args += listOf("--cookies", cookie.path)
-            val cached = cachedMetadata(input)
+            val cached =
+                cachedMetadata(input)?.let { source ->
+                    runCatching { source.copyTo(File(directory, "cached-info.json"), overwrite = true) }.getOrNull()
+                }
             if (cached != null && cookie == null && !profile.liveFromStart) {
                 args += listOf("--load-info-json", cached.path)
             } else {
@@ -456,6 +472,7 @@ import javax.inject.Singleton
                 }
             } finally {
                 cookie?.delete()
+                cached?.delete()
             }
             check(files.isNotEmpty() && files.all { it.exists() && it.length() > 0 }) { "No complete output was produced" }
             return files

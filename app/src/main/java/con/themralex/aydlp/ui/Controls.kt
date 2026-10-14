@@ -236,7 +236,7 @@ import con.themralex.aydlp.ui.designsystem.*
     }
 }
 
-internal fun profileSummary(profile): String = if (profile.audio) "Audio · ${profile.bitrate} kbps · ${profile.container.uppercase()}" else "${profile.resolution}p · ${profile.container.uppercase()}${if (profile.formatId.isNotBlank()) " · Manual" else ""}"
+internal fun profileSummary(profile: Profile): String = if (profile.audio) "Audio · ${profile.bitrate} kbps · ${profile.container.uppercase()}" else "${profile.resolution}p · ${profile.container.uppercase()}${if (profile.formatId.isNotBlank()) " · Manual" else ""}"
 
 internal fun downloadStateLabel(
     state: DownloadState,

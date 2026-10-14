@@ -91,6 +91,7 @@ import javax.inject.Inject
                     previous?.join()
                     busy.value = true
                     info.value = null
+                    profile.value = profile.value.copy(formatId = "")
                     try {
                         val key = Inputs.normalize(input)
                         val hit = cache[key]

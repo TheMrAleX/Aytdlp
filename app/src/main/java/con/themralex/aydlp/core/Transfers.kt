@@ -61,10 +61,10 @@ class Notifications(
                 .setProgress(
                     100,
                     row?.progress?.toInt() ?: 0,
-                    row == null || row.total == 0L,
+                    row == null || (row.state in con.themralex.aydlp.domain.StateMachine.active && row.total == 0L),
                 ).setCategory(NotificationCompat.CATEGORY_PROGRESS)
         if (row != null && row.state !in setOf(DownloadState.COMPLETED, DownloadState.CANCELED)) {
-            for (action in listOf(if (row.state == DownloadState.PAUSED) "resume" else "pause", "cancel")) {
+            for (action in listOf(if (row.state in setOf(DownloadState.PAUSED, DownloadState.FAILED)) "resume" else "pause", "cancel")) {
                 val intent = Intent(context, ActionReceiver::class.java).setAction(action).putExtra("id", row.id)
                 b.addAction(
                     0,
@@ -120,7 +120,18 @@ interface BackgroundEntry {
 fun background(context: Context) = EntryPointAccessors.fromApplication(context.applicationContext, BackgroundEntry::class.java)
 
 object Transfers {
-    @Volatile var active = false
+    private val owners =
+        java.util.concurrent.atomic
+            .AtomicInteger(0)
+    val active get() = owners.get() > 0
+
+    fun attached() {
+        owners.incrementAndGet()
+    }
+
+    fun detached() {
+        owners.decrementAndGet()
+    }
 
     suspend fun start(
         context: Context,
@@ -215,7 +226,7 @@ object Transfers {
     private var task: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {
-        Transfers.active = true
+        Transfers.attached()
         val notices = Notifications(this)
         if (Build.VERSION.SDK_INT >= 34 &&
             params.isUserInitiatedJob
@@ -238,7 +249,7 @@ object Transfers {
                     }
                 } finally {
                     withContext(NonCancellable + Dispatchers.Main) {
-                        Transfers.active = false
+                        Transfers.detached()
                         jobFinished(params, false)
                         if (queue.dao.all().any { it.state == DownloadState.QUEUED }) Transfers.wake(this@TransferJobService)
                     }
@@ -258,7 +269,6 @@ object Transfers {
     override fun onDestroy() {
         scope.launch {
             task?.cancelAndJoin()
-            Transfers.active = false
             scope.cancel()
         }
         super.onDestroy()
@@ -279,7 +289,7 @@ object Transfers {
         startId: Int,
     ): Int {
         if (task?.isActive == true) return START_NOT_STICKY
-        Transfers.active = true
+        Transfers.attached()
         val n = Notifications(this)
         startForeground(410, n.notification())
         task =
@@ -287,7 +297,7 @@ object Transfers {
                 try {
                     queue.drain { n.update(it) }
                 } finally {
-                    Transfers.active = false
+                    Transfers.detached()
                     stopSelf()
                 }
             }
@@ -308,7 +318,6 @@ object Transfers {
     override fun onDestroy() {
         scope.launch {
             task?.cancelAndJoin()
-            Transfers.active = false
             scope.cancel()
         }
         super.onDestroy()
@@ -325,7 +334,12 @@ class QueueWakeWorker(
         } else {
             val notices = Notifications(applicationContext)
             setForeground(ForegroundInfo(410, notices.notification()))
-            background(applicationContext).queue().drain { notices.update(it) }
+            Transfers.attached()
+            try {
+                background(applicationContext).queue().drain { notices.update(it) }
+            } finally {
+                Transfers.detached()
+            }
         }
         return Result.success()
     }
