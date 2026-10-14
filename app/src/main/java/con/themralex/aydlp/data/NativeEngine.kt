@@ -410,11 +410,14 @@ import javax.inject.Singleton
                     listOf(
                         "-f",
                         profile.formatId.ifBlank {
-                            "bv*[height<=${profile.resolution}]$codec+ba/b[height<=${profile.resolution}]/best"
+                            "bv*$codec+ba/b$codec/bv*+ba/b"
                         },
                         "--merge-output-format",
                         profile.container,
                     )
+            }
+            if (!profile.audio && profile.formatId.isBlank() && profile.resolution > 0) {
+                args += listOf("-S", "res:${profile.resolution}")
             }
             if (profile.metadata) args += "--embed-metadata"
             if (profile.chapters) args += "--embed-chapters"

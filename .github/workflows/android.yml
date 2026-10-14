@@ -31,7 +31,9 @@ jobs:
           python3 scripts/prepare_engine.py
           python3 scripts/prepare_native.py --ndk "$ANDROID_HOME/ndk/28.2.13676358" --ninja "$(command -v ninja)"
       - name: Process interruption tests
-        run: python3 scripts/test_process_faults.py
+        run: |
+          python3 scripts/test_process_faults.py
+          python3 scripts/test_quality_presets.py
       - name: Build, unit tests and Android lint
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug ktlintCheck detekt --max-workers=2
       - name: Audit packaged native libraries
@@ -104,7 +106,7 @@ jobs:
         run: |
           tag="${REQUESTED_RELEASE_TAG:-}"
           if test -z "$tag"; then
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="$GITHUB_REF_NAME"; else tag=v0.1.1; fi
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="$GITHUB_REF_NAME"; else tag=v0.1.2; fi
           fi
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release tag'; exit 1; }
           if gh release view "$tag" > /dev/null 2>&1; then

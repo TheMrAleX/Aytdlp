@@ -31,6 +31,7 @@ import javax.inject.Singleton
         private var recovered = false
         private val running = ConcurrentHashMap<String, Job>()
         private val drainLock = Mutex()
+        private val previews = ConcurrentHashMap<String, Deferred<MediaInfo>>()
 
         suspend fun enqueue(
             input: String,
@@ -38,6 +39,7 @@ import javax.inject.Singleton
             schedule: Long = 0,
             charging: Boolean = false,
             info: MediaInfo? = null,
+            analysis: Deferred<MediaInfo>? = null,
         ): String =
             db.withTransaction {
                 val url = Inputs.normalize(input)
@@ -64,6 +66,7 @@ import javax.inject.Singleton
                     ),
                 )
                 settings.text("lastProfile", ProfileJson.encode(profile))
+                if (analysis != null) previews[id] = analysis
                 id
             }
 
@@ -115,6 +118,7 @@ import javax.inject.Singleton
                     engine.stop(id)
                     engine.stop("analysis-$id")
                     job?.join()
+                    previews.remove(id)
                     File(context.noBackupFilesDir, "staging/$id").deleteRecursively()
                     dao.get(id)?.let {
                         con.themralex.aydlp.core
@@ -190,7 +194,7 @@ import javax.inject.Singleton
             try {
                 val row = dao.get(id) ?: return
                 val info =
-                    native.cachedInfo(row.url) ?: if (row.title.isNotBlank()) {
+                    previews[id]?.await() ?: native.cachedInfo(row.url) ?: if (row.title.isNotBlank()) {
                         MediaInfo(row.url, row.url, row.title, row.channel, row.thumbnail, 0, emptyList())
                     } else {
                         engine.analyze(row.url, "analysis-$id")
@@ -260,6 +264,8 @@ import javax.inject.Singleton
                     if (transition(id, DownloadState.QUEUED)) transition(id, DownloadState.SCHEDULED)
                 }
                 dao.get(id)?.let { onChanged(it) }
+            } finally {
+                if (previews[id]?.isCompleted == true) previews.remove(id)
             }
         }
 

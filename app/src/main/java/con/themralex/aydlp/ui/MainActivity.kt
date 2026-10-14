@@ -104,9 +104,10 @@ import kotlinx.coroutines.*
             AytdlpScreen(
                 vm,
                 enqueue = { input, schedule ->
+                    val selectedProfile = vm.profile.value
                     requestNotifications()
                     vm.action {
-                        vm.enqueue(input, schedule)
+                        vm.enqueue(input, schedule, selectedProfile)
                         withContext(Dispatchers.Main) {
                             if (schedule <=
                                 System.currentTimeMillis()
@@ -119,7 +120,6 @@ import kotlinx.coroutines.*
                                 )
                             }
                         }
-                        vm.message.value = "Added to queue"
                     }
                 },
                 startQueue = {

@@ -12,8 +12,8 @@ android {
         applicationId = "con.themralex.aydlp"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("AYTDLP_VERSION_CODE")?.toIntOrNull() ?: 1001
-        versionName = System.getenv("AYTDLP_VERSION_NAME") ?: "0.1.1"
+        versionCode = System.getenv("AYTDLP_VERSION_CODE")?.toIntOrNull() ?: 1002
+        versionName = System.getenv("AYTDLP_VERSION_NAME") ?: "0.1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
