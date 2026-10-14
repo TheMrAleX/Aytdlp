@@ -248,14 +248,14 @@ import javax.inject.Singleton
                         target.parentFile?.mkdirs()
                         // Only complete video results can be downloaded without another extraction.
                         if (info.entries.isEmpty() && info.formats.isNotEmpty() && info.live in listOf("", "not_live", "was_live")) {
-                            target.writeText(raw)
-                            metadataFile(info.url, options).writeText(raw)
+                            saveMetadata(target, raw)
+                            saveMetadata(metadataFile(info.url, options), raw)
                         }
-                        target.parentFile
-                            ?.listFiles()
-                            ?.sortedByDescending { it.lastModified() }
-                            ?.drop(20)
-                            ?.forEach { it.delete() }
+                        var retainedBytes = 0L
+                        target.parentFile?.listFiles()?.filter { it.extension == "json" }?.sortedByDescending { it.lastModified() }?.forEach { file ->
+                            retainedBytes += file.length()
+                            if (retainedBytes > 64L * 1024 * 1024 || System.currentTimeMillis() - file.lastModified() > 120_000) file.delete()
+                        }
                     }
                     info
                 } finally {
