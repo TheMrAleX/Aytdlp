@@ -61,7 +61,6 @@ import java.util.Locale
     val rows by vm.downloads.collectAsStateWithLifecycle()
     val info by vm.info.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
-    val queueingAnalysis by vm.queueingAnalysis.collectAsStateWithLifecycle()
     val analysisError by vm.analysisError.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val health by vm.health.collectAsStateWithLifecycle()
@@ -177,7 +176,7 @@ import java.util.Locale
                                             Panel(Modifier.fillMaxWidth()) {
                                                 Label(tr("Quality", "Calidad"), bold = true)
                                                 QualityPresets(profile, es) { resolution -> vm.edit { it.copy(resolution = resolution, formatId = "") } }
-                                                AyButton(tr("Add to queue", "Añadir a la cola"), Modifier.fillMaxWidth(), enabled = !queueingAnalysis) {
+                                                AyButton(tr("Add to queue", "Añadir a la cola"), Modifier.fillMaxWidth()) {
                                                     enqueue(vm.analysisInput, 0)
                                                     tab = 1
                                                 }
@@ -277,14 +276,7 @@ import java.util.Locale
                                         IconAction("play", tr("Resume all", "Reanudar todas"), onClick = startQueue)
                                         IconAction("pause", tr("Pause all", "Pausar todas")) { vm.action { vm.queue.pauseAll() } }
                                     }
-                                    if (queueingAnalysis) {
-                                        Panel(Modifier.fillMaxWidth()) {
-                                            Label(tr("Analyzing", "Analizando"), color = t.accent)
-                                            LoadingBar()
-                                            TextAction(tr("Cancel", "Cancelar"), vm::cancelAnalysis)
-                                        }
-                                    }
-                                    if (transfers.isEmpty() && !queueingAnalysis) {
+                                    if (transfers.isEmpty()) {
                                         Empty(tr("Queue empty", "Cola vacía"), tr("Add a link to download.", "Añade un enlace para descargar."))
                                     }
                                     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 100.dp)) {

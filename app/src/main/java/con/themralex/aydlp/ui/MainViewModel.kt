@@ -57,7 +57,7 @@ import javax.inject.Inject
         private val lastAnalysisReport = MutableStateFlow("")
         val health = MutableStateFlow<EngineHealth?>(null)
         val profile = MutableStateFlow(Profile())
-        val queueingAnalysis = MutableStateFlow(false)
+        private var analysisResult: CompletableDeferred<MediaInfo>? = null
         var analysisInput = ""
             private set
         private var analysis: Job? = null
@@ -90,6 +90,8 @@ import javax.inject.Inject
             val token = "preview-${java.util.UUID.randomUUID()}"
             analysisToken = token
             val previous = analysis
+            val result = CompletableDeferred<MediaInfo>()
+            analysisResult = result
             previous?.cancel()
             analysis =
                 viewModelScope.launch {
@@ -111,6 +113,7 @@ import javax.inject.Inject
                             } else {
                                 engine.analyze(key, token)
                             }
+                        result.complete(value)
                         info.value = value
                         cache[key] =
                             System.currentTimeMillis() to value
@@ -120,8 +123,10 @@ import javax.inject.Inject
                             cache.remove(cache.keys.first())
                         }
                     } catch (e: CancellationException) {
+                        result.cancel(e)
                         throw e
                     } catch (e: Exception) {
+                        result.completeExceptionally(e)
                         lastAnalysisReport.value = Errors.redact(e.stackTraceToString())
                         analysisError.value =
                             Errors
@@ -134,6 +139,9 @@ import javax.inject.Inject
                             false
                     }
                 }
+            analysis?.invokeOnCompletion { cause ->
+                if (!result.isCompleted) result.completeExceptionally(cause ?: CancellationException("Analysis canceled"))
+            }
         }
 
         fun cancelAnalysis() {
@@ -161,21 +169,12 @@ import javax.inject.Inject
             selectedProfile: Profile = profile.value,
         ): String {
             val normalized = Inputs.normalize(input)
-            val pending = analysis
-            if (busy.value && Inputs.normalize(analysisInput) == normalized) {
-                queueingAnalysis.value = true
-                try {
-                    pending?.join()
-                    check(info.value != null) { analysisError.value.ifBlank { "Analysis canceled" } }
-                } finally {
-                    queueingAnalysis.value = false
-                }
-            }
+            val pending = if (busy.value && Inputs.normalize(analysisInput) == normalized) analysisResult else null
             val selected =
                 info.value?.let { media ->
                     if (Inputs.normalize(media.url) == normalized || (analysisInput.isNotBlank() && Inputs.normalize(analysisInput) == normalized && media.entries.isEmpty())) media else media.entries.firstOrNull { Inputs.normalize(it.url) == normalized }
                 }
-            return queue.enqueue(selected?.url ?: input, selectedProfile, schedule, info = selected)
+            return queue.enqueue(selected?.url ?: input, selectedProfile, schedule, info = selected, analysis = pending)
         }
 
         fun text(

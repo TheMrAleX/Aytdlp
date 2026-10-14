@@ -29,6 +29,15 @@ class UiSmokeTest {
         compose.onNodeWithText("Let's begin").performClick()
         compose.onNodeWithText("Analyze").assertIsNotEnabled()
         capture("download-dark")
+        val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[con.themralex.aydlp.ui.MainViewModel::class.java]
+        compose.runOnIdle { vm.busy.value = true }
+        compose.onNodeWithText("480p").performScrollTo().performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(480, vm.profile.value.resolution) }
+        compose.onNodeWithText("Best").performScrollTo().performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(0, vm.profile.value.resolution) }
+        compose.onNodeWithText("Add to queue").assertIsEnabled()
+        capture("quality-during-analysis")
+        compose.runOnIdle { vm.busy.value = false }
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("--invalid")
         compose.onNodeWithText("Analyze").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("Couldn't analyze the link").fetchSemanticsNodes().isNotEmpty() }

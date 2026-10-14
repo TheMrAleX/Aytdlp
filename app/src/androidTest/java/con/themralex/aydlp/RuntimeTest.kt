@@ -7,7 +7,11 @@ import con.themralex.aydlp.core.background
 import con.themralex.aydlp.data.AppDatabase
 import con.themralex.aydlp.data.DownloadRow
 import con.themralex.aydlp.data.NativeEngine
+import con.themralex.aydlp.data.Publisher
+import con.themralex.aydlp.data.QueueRepository
+import con.themralex.aydlp.domain.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +19,66 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class RuntimeTest {
+    @Test fun queuedPreviewIsReusedAndPauseResumeKeepsMetadata(): Unit =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val entry = background(context)
+            val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+            val settings = entry.settings()
+            val previousProfile = settings.get().lastProfile
+            val started = Channel<Profile>(Channel.UNLIMITED)
+            val fake =
+                object : ExtractionEngine {
+                    override suspend fun health(): EngineHealth = error("Not used")
+
+                    override suspend fun analyze(
+                        input: String,
+                        token: String,
+                    ): MediaInfo = error("Preview must be reused")
+
+                    override suspend fun stop(token: String) = Unit
+
+                    override suspend fun download(
+                        input: String,
+                        token: String,
+                        directory: File,
+                        profile: Profile,
+                        onProgress: suspend (Progress) -> Unit,
+                    ): List<File> {
+                        started.send(profile)
+                        awaitCancellation()
+                    }
+                }
+            val queue = QueueRepository(context, db, fake, entry.engine() as NativeEngine, settings, Publisher(context, settings))
+            val preview = CompletableDeferred<MediaInfo>()
+            val url = "https://example.com/preview-handoff"
+            val id = queue.enqueue(url, Profile(resolution = 480), analysis = preview)
+            val drain = launch { queue.drain {} }
+            try {
+                withTimeout(10000) {
+                    while (db.downloads().get(id)?.state != DownloadState.ANALYZING) delay(20)
+                }
+                assertTrue(started.tryReceive().isFailure)
+                preview.complete(MediaInfo("fixture", url, "Preview title", "Channel", "", 10, emptyList()))
+                withTimeout(10000) { assertEquals(480, started.receive().resolution) }
+                assertEquals("Preview title", db.downloads().get(id)?.title)
+                withTimeout(5000) { assertTrue(queue.pause(id)) }
+                assertEquals(DownloadState.PAUSED, db.downloads().get(id)?.state)
+                drain.join()
+                queue.resume(id)
+                val resumed = launch { queue.drain {} }
+                withTimeout(10000) { assertEquals(480, started.receive().resolution) }
+                queue.cancel(id)
+                resumed.join()
+                assertEquals(DownloadState.CANCELED, db.downloads().get(id)?.state)
+            } finally {
+                drain.cancelAndJoin()
+                queue.stopRunning()
+                db.close()
+                settings.text("lastProfile", previousProfile)
+            }
+        }
+
     @Test fun cancelSilentExtractorReleasesProcess(): Unit =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
