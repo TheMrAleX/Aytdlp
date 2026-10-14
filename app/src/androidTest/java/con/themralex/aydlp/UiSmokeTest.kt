@@ -31,11 +31,8 @@ class UiSmokeTest {
         capture("download-dark")
         val vm = androidx.lifecycle.ViewModelProvider(compose.activity)[con.themralex.aydlp.ui.MainViewModel::class.java]
         compose.runOnIdle { vm.busy.value = true }
-        compose.onNodeWithText("480p").performScrollTo().performClick()
-        compose.runOnIdle { org.junit.Assert.assertEquals(480, vm.profile.value.resolution) }
-        compose.onNodeWithText("Best").performScrollTo().performClick()
-        compose.runOnIdle { org.junit.Assert.assertEquals(0, vm.profile.value.resolution) }
-        compose.onNodeWithText("Add to queue").assertIsEnabled()
+        compose.onNodeWithText("480p").performScrollTo().assertHasClickAction()
+        compose.onNodeWithText("Best").assertHasClickAction()
         capture("quality-during-analysis")
         compose.runOnIdle { vm.busy.value = false }
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("--invalid")

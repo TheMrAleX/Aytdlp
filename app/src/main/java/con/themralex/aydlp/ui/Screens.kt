@@ -174,11 +174,17 @@ import java.util.Locale
                                     if (busy) {
                                         item {
                                             Panel(Modifier.fillMaxWidth()) {
-                                                Label(tr("Quality", "Calidad"), bold = true)
-                                                QualityPresets(profile, es) { resolution -> vm.edit { it.copy(resolution = resolution, formatId = "") } }
-                                                AyButton(tr("Add to queue", "Añadir a la cola"), Modifier.fillMaxWidth()) {
+                                                Label(tr("Download in", "Descargar en"), bold = true)
+                                                QualityPresets(profile, es) { resolution ->
+                                                    vm.edit { it.copy(resolution = resolution, formatId = "") }
                                                     enqueue(vm.analysisInput, 0)
                                                     tab = 1
+                                                }
+                                                if (profile.audio) {
+                                                    AyButton(tr("Add to queue", "Añadir a la cola"), Modifier.fillMaxWidth()) {
+                                                        enqueue(vm.analysisInput, 0)
+                                                        tab = 1
+                                                    }
                                                 }
                                             }
                                         }
