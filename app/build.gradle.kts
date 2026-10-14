@@ -12,8 +12,8 @@ android {
         applicationId = "con.themralex.aydlp"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("AYTDLP_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = System.getenv("AYTDLP_VERSION_NAME") ?: "0.1.0"
+        versionCode = System.getenv("AYTDLP_VERSION_CODE")?.toIntOrNull() ?: 1001
+        versionName = System.getenv("AYTDLP_VERSION_NAME") ?: "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
@@ -72,6 +72,7 @@ ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")

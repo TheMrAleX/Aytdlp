@@ -137,7 +137,11 @@ class ProcessOutputBuffer(
     private val text = StringBuilder()
 
     fun append(line: String) {
-        require(line.length < limit) { "Extractor output line exceeds the safe limit; try a smaller playlist" }
+        if (line.length >= limit) {
+            text.clear()
+            text.append(line.takeLast(limit - 1)).append('\n')
+            return
+        }
         val excess = text.length + line.length + 1 - limit
         if (excess > 0) text.delete(0, excess)
         text.appendLine(line)

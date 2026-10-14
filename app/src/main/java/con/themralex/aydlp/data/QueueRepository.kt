@@ -37,6 +37,7 @@ import javax.inject.Singleton
             profile: Profile,
             schedule: Long = 0,
             charging: Boolean = false,
+            info: MediaInfo? = null,
         ): String =
             db.withTransaction {
                 val url = Inputs.normalize(input)
@@ -46,6 +47,9 @@ import javax.inject.Singleton
                     DownloadRow(
                         id,
                         url,
+                        title = info?.title.orEmpty(),
+                        thumbnail = info?.thumbnail.orEmpty(),
+                        channel = info?.channel.orEmpty(),
                         profile = ProfileJson.encode(profile),
                         state =
                             if (schedule >
@@ -73,26 +77,52 @@ import javax.inject.Singleton
             return dao.transition(id, row.state, next, failure) == 1
         }
 
-        suspend fun pause(id: String) {
-            if (transition(id, DownloadState.PAUSED)) {
-                engine.stop(id)
-                engine.stop("analysis-$id")
-                running[id]?.cancel()
+        suspend fun pause(id: String): Boolean =
+            claim.withLock {
+                val changed = transition(id, DownloadState.PAUSED)
+                if (changed) {
+                    val job = running[id]
+                    job?.cancel()
+                    engine.stop(id)
+                    engine.stop("analysis-$id")
+                    job?.join()
+                    dao.get(id)?.let {
+                        con.themralex.aydlp.core
+                            .Notifications(context)
+                            .update(it)
+                    }
+                }
+                changed
             }
-        }
 
-        suspend fun resume(id: String) {
-            transition(id, DownloadState.QUEUED)
-        }
-
-        suspend fun cancel(id: String) {
-            if (transition(id, DownloadState.CANCELED)) {
-                engine.stop(id)
-                engine.stop("analysis-$id")
-                running[id]?.cancelAndJoin()
-                File(context.noBackupFilesDir, "staging/$id").deleteRecursively()
+        suspend fun resume(id: String) =
+            claim.withLock {
+                running[id]?.join()
+                if (transition(id, DownloadState.QUEUED)) {
+                    dao.get(id)?.let {
+                        con.themralex.aydlp.core
+                            .Notifications(context)
+                            .update(it)
+                    }
+                }
             }
-        }
+
+        suspend fun cancel(id: String) =
+            claim.withLock {
+                if (transition(id, DownloadState.CANCELED)) {
+                    val job = running[id]
+                    job?.cancel()
+                    engine.stop(id)
+                    engine.stop("analysis-$id")
+                    job?.join()
+                    File(context.noBackupFilesDir, "staging/$id").deleteRecursively()
+                    dao.get(id)?.let {
+                        con.themralex.aydlp.core
+                            .Notifications(context)
+                            .update(it)
+                    }
+                }
+            }
 
         suspend fun pauseAll() {
             dao
@@ -132,7 +162,8 @@ import javax.inject.Singleton
                         val queued = rows.filter { it.state == DownloadState.QUEUED }
                         val capacity = (s.concurrency.coerceIn(1, 6) - running.size).coerceAtLeast(0)
                         queued.take(capacity).forEach { row ->
-                            if (claim.withLock { transition(row.id, DownloadState.ANALYZING) }) {
+                            claim.withLock {
+                                if (!transition(row.id, DownloadState.ANALYZING)) return@withLock
                                 val job =
                                     launch(start = CoroutineStart.LAZY) {
                                         try {
@@ -158,7 +189,12 @@ import javax.inject.Singleton
             val directory = File(context.noBackupFilesDir, "staging/$id").apply { mkdirs() }
             try {
                 val row = dao.get(id) ?: return
-                val info = engine.analyze(row.url, "analysis-$id")
+                val info =
+                    native.cachedInfo(row.url) ?: if (row.title.isNotBlank()) {
+                        MediaInfo(row.url, row.url, row.title, row.channel, row.thumbnail, 0, emptyList())
+                    } else {
+                        engine.analyze(row.url, "analysis-$id")
+                    }
                 val selectedProfile = ProfileJson.decode(row.profile)
                 val mediaEstimate = if (selectedProfile.audio && info.duration > 0) info.duration * selectedProfile.bitrate * 125 else info.size.takeIf { it > 0 } ?: 300_000_000L
                 val estimate = mediaEstimate * 2 + 100_000_000L
@@ -212,7 +248,7 @@ import javax.inject.Singleton
                 e: Exception,
             ) {
                 val failure = Errors.classify(e.message.orEmpty())
-                transition(id, DownloadState.FAILED, "${failure.kind}: ${failure.action}")
+                if (!transition(id, DownloadState.FAILED, "${failure.kind}: ${failure.action}")) return
                 val row = dao.get(id)
                 if (row != null &&
                     failure.kind.retryable &&
@@ -229,7 +265,7 @@ import javax.inject.Singleton
 
         suspend fun yieldRunning() {
             running.keys.toList().forEach { id ->
-                pause(id)
+                if (!pause(id)) return@forEach
                 val row = dao.get(id)
                 if (row?.state == DownloadState.PAUSED) {
                     if (transition(id, DownloadState.QUEUED)) transition(id, DownloadState.SCHEDULED, "System paused; waiting for constraints")

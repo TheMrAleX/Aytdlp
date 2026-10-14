@@ -40,9 +40,42 @@ if watcher == 0:
 with open(os.devnull, "rb") as null:
     os.dup2(null.fileno(), 0)
 print("AYTDLP_PID:" + str(group), flush=True)
+# Metadata goes to its own bounded file, never through the diagnostic line buffer.
+metadata = None
+if len(sys.argv) > 2 and sys.argv[1] == "--aytdlp-json-output":
+    metadata = open(sys.argv[2], "w", encoding="utf-8")
+    del sys.argv[1:3]
+
+class MetadataOutput:
+    def __init__(self, target):
+        self.target = target
+        self.size = 0
+
+    def __getattr__(self, name):
+        return getattr(self.target, name)
+
+    @property
+    def buffer(self):
+        return self
+
+    def write(self, text):
+        self.size += len(text if isinstance(text, bytes) else text.encode("utf-8"))
+        if self.size > 32 * 1024 * 1024:
+            raise ValueError("Metadata exceeds 32 MiB; select fewer playlist items")
+        return self.target.buffer.write(text) if isinstance(text, bytes) else self.target.write(text)
+
+    def flush(self):
+        self.target.flush()
+
+original_stdout = sys.stdout
 try:
+    if metadata is not None:
+        sys.stdout = MetadataOutput(metadata)
     runpy.run_path(engine, run_name="__main__")
 finally:
+    sys.stdout = original_stdout
+    if metadata is not None:
+        metadata.close()
     try:
         os.kill(watcher, signal.SIGTERM)
     except ProcessLookupError:

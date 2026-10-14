@@ -62,6 +62,57 @@ class ProcessFaultTests(unittest.TestCase):
             result=subprocess.run([sys.executable,str(ROOT.parent/"app/src/main/assets/runner.py"),str(engine),"solver-fixture","--aytdlp-verify-solver"],capture_output=True,text=True,timeout=10)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertIn("AYTDLP_EJS_OK",result.stdout)
+    def test_metadata_writer_preserves_large_json_and_bounds_binary_output(self):
+        import ast, io, json
+        source = ast.parse((ROOT.parent / "app/src/main/assets/runner.py").read_text())
+        node = next(n for n in source.body if isinstance(n, ast.ClassDef) and n.name == "MetadataOutput")
+        namespace = {}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "runner.py", "exec"), namespace)
+        target = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        writer = namespace["MetadataOutput"](target)
+        payload = json.dumps({"title": "x" * 3_000_000})
+        writer.write(payload)
+        writer.flush()
+        self.assertEqual(json.loads(target.buffer.getvalue())["title"], "x" * 3_000_000)
+        with self.assertRaises(ValueError):
+            writer.buffer.write(b"x" * (33 * 1024 * 1024))
+        self.assertEqual(len(target.buffer.getvalue()), len(payload))
+
+    def metadata_run(self, engine, output):
+        args = [sys.executable, str(ROOT.parent / "app/src/main/assets/runner.py"), str(engine), "metadata-test", "--aytdlp-json-output", str(output)]
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            p.wait(timeout=10)
+            stdout, stderr = p.communicate()
+            return subprocess.CompletedProcess(args, p.returncode, stdout, stderr)
+        finally:
+            if p.poll() is None:
+                os.killpg(p.pid, signal.SIGKILL)
+                p.communicate()
+
+    def test_large_metadata_is_not_sent_to_diagnostic_pipe(self):
+        import json
+        with tempfile.TemporaryDirectory() as temporary:
+            d = Path(temporary)
+            engine = d / "engine.py"
+            engine.write_text('import json; print(json.dumps({"title": "x" * 3_000_000}))')
+            output = d / "metadata.json"
+            result = self.metadata_run(engine, output)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertLess(len(result.stdout), 100)
+            self.assertEqual(len(json.loads(output.read_text())["title"]), 3_000_000)
+
+    def test_metadata_limit_rejects_oversized_results(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            d = Path(temporary)
+            engine = d / "engine.py"
+            engine.write_text('print("x" * (33 * 1024 * 1024))')
+            output = d / "metadata.json"
+            result = self.metadata_run(engine, output)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Metadata exceeds", result.stderr)
+            self.assertLessEqual(output.stat().st_size, 32 * 1024 * 1024)
+
     def test_solver_missing_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             engine=Path(temporary)/"yt-dlp"

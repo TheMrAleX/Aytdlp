@@ -82,10 +82,10 @@ class DomainTest {
         assertTrue(buffer.toString().length <= 120_000)
     }
 
-    @Test fun oversizedExtractorLineFailsBeforeReturningCorruptJson() {
+    @Test fun oversizedDiagnosticLineKeepsBoundedTail() {
         val buffer = ProcessOutputBuffer(100)
-        assertThrows(IllegalArgumentException::class.java) { buffer.append("x".repeat(100)) }
-        assertEquals("", buffer.toString())
+        buffer.append("x".repeat(200))
+        assertEquals("x".repeat(99) + "\n", buffer.toString())
     }
 
     @Test fun filenamesRespectUtf8Boundary() {
