@@ -301,11 +301,11 @@ object Transfers {
                 try {
                     queue.drain { n.update(it) }
                 } finally {
-                    withContext(NonCancellable) {
+                    withContext(NonCancellable + Dispatchers.Main) {
                         Transfers.detached()
                         val pending = queue.dao.all().filter { it.state == DownloadState.SCHEDULED || it.state == DownloadState.QUEUED }
                         pending.minOfOrNull { it.scheduled }?.let { Transfers.wake(this@TransferService, it - System.currentTimeMillis()) }
-                        stopSelf(startId)
+                        stopSelf()
                     }
                 }
             }

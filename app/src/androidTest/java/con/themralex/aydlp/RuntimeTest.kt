@@ -19,6 +19,45 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class RuntimeTest {
+    @Test fun userDownloadLeavesQueuedState(): Unit =
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val entry = background(context)
+            val settings = entry.settings()
+            val saved = settings.get()
+            val queue = entry.queue()
+            val url = "https://example.invalid/queue-start-regression"
+            val scenario =
+                androidx.test.core.app.ActivityScenario
+                    .launch(con.themralex.aydlp.ui.MainActivity::class.java)
+            var id: String? = null
+            try {
+                settings.boolean("wifi", false)
+                settings.boolean("charging", false)
+                val queuedId = queue.enqueue(url, Profile(), info = MediaInfo("start-fixture", url, "Queue start", "", "", 0, emptyList()))
+                id = queuedId
+                scenario.onActivity { activity ->
+                    runBlocking {
+                        con.themralex.aydlp.core.Transfers
+                            .start(activity, true)
+                    }
+                }
+                withTimeout(15000) {
+                    while (queue.dao.get(queuedId)?.state == DownloadState.QUEUED) delay(50)
+                }
+                assertTrue(queue.dao.get(queuedId)?.state in StateMachine.active + DownloadState.FAILED + DownloadState.SCHEDULED)
+            } finally {
+                id?.let {
+                    queue.cancel(it)
+                    queue.dao.delete(it)
+                }
+                settings.boolean("wifi", saved.wifi)
+                settings.boolean("charging", saved.charging)
+                settings.text("lastProfile", saved.lastProfile)
+                scenario.close()
+            }
+        }
+
     @Test fun queuedPreviewIsReusedAndPauseResumeKeepsMetadata(): Unit =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
