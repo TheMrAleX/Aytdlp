@@ -218,7 +218,9 @@ import java.util.Locale
                                         }
                                     }
                                 }
-                                AyFab("folder", tr("Locate all", "Ubicar todas"), Modifier.align(Alignment.BottomEnd).padding(20.dp), onClick = locateDownloads)
+                                AyFab("folder", tr("Locate all", "Ubicar todas"), Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
+                                    if (settings.destination.isBlank()) tab = 2 else locateDownloads()
+                                }
                             }
                         }
 

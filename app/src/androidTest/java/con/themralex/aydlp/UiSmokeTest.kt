@@ -15,7 +15,8 @@ class UiSmokeTest {
         compose.onNodeWithText("Let's begin").performClick()
         compose.onNodeWithText("Queue").performClick()
         compose.onNodeWithContentDescription("Pause all").assertExists()
-        compose.onNodeWithText("Locate all").assertExists()
+        compose.onNodeWithText("Locate all").performClick()
+        compose.onNodeWithText("No downloads yet").assertExists()
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText("Appearance").assertExists()
     }
