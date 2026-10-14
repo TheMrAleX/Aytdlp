@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths: ['app/proguard-rules.pro', '.github/workflows/release-regression.yml']
+  pull_request:
+    paths: ['.github/workflows/release-regression.yml']
   workflow_dispatch:
 permissions:
   contents: read
