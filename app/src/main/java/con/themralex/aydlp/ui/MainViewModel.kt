@@ -56,6 +56,7 @@ import javax.inject.Inject
         val health = MutableStateFlow<EngineHealth?>(null)
         val profile = MutableStateFlow(Profile())
         private var analysis: Job? = null
+        private var analysisToken = "preview"
         private val cache = LinkedHashMap<String, Pair<Long, MediaInfo>>()
 
         init {
@@ -79,9 +80,15 @@ import javax.inject.Inject
         }
 
         fun analyze(input: String) {
-            analysis?.cancel()
+            val previousToken = analysisToken
+            val token = "preview-${java.util.UUID.randomUUID()}"
+            analysisToken = token
+            val previous = analysis
+            previous?.cancel()
             analysis =
                 viewModelScope.launch {
+                    engine.stop(previousToken)
+                    previous?.join()
                     busy.value = true
                     info.value = null
                     try {
@@ -94,7 +101,7 @@ import javax.inject.Inject
                             ) {
                                 hit.second
                             } else {
-                                engine.analyze(key, "preview")
+                                engine.analyze(key, token)
                             }
                         info.value = value
                         cache[key] =
@@ -117,7 +124,8 @@ import javax.inject.Inject
         }
 
         fun cancelAnalysis() {
-            action { engine.stop("preview") }
+            val token = analysisToken
+            action { engine.stop(token) }
             analysis?.cancel()
             busy.value = false
         }
@@ -137,7 +145,14 @@ import javax.inject.Inject
         suspend fun enqueue(
             input: String,
             schedule: Long = 0,
-        ): String = queue.enqueue(input, profile.value, schedule)
+        ): String {
+            val normalized = Inputs.normalize(input)
+            val selected =
+                info.value?.let { media ->
+                    if (Inputs.normalize(media.url) == normalized) media else media.entries.firstOrNull { Inputs.normalize(it.url) == normalized }
+                }
+            return queue.enqueue(input, profile.value, schedule, info = selected)
+        }
 
         fun text(
             key: String,

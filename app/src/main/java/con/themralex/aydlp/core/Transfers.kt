@@ -57,12 +57,13 @@ class Notifications(
                     true,
                 ).setOngoing(row == null || row.state in con.themralex.aydlp.domain.StateMachine.active)
                 .setGroup("queue")
+                .setGroupSummary(row == null)
                 .setProgress(
                     100,
                     row?.progress?.toInt() ?: 0,
                     row == null || row.total == 0L,
                 ).setCategory(NotificationCompat.CATEGORY_PROGRESS)
-        if (row != null) {
+        if (row != null && row.state !in setOf(DownloadState.COMPLETED, DownloadState.CANCELED)) {
             for (action in listOf(if (row.state == DownloadState.PAUSED) "resume" else "pause", "cancel")) {
                 val intent = Intent(context, ActionReceiver::class.java).setAction(action).putExtra("id", row.id)
                 b.addAction(
@@ -91,6 +92,10 @@ class Notifications(
     }
 
     fun update(row: DownloadRow) {
+        if (row.state == DownloadState.CANCELED) {
+            manager.cancel(row.id.hashCode())
+            return
+        }
         if (Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -115,10 +120,13 @@ interface BackgroundEntry {
 fun background(context: Context) = EntryPointAccessors.fromApplication(context.applicationContext, BackgroundEntry::class.java)
 
 object Transfers {
+    @Volatile var active = false
+
     suspend fun start(
         context: Context,
         userInitiated: Boolean,
     ) {
+        if (active) return
         val s = background(context).settings().get()
         if (Build.VERSION.SDK_INT >= 34) {
             val network =
@@ -207,6 +215,7 @@ object Transfers {
     private var task: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {
+        Transfers.active = true
         val notices = Notifications(this)
         if (Build.VERSION.SDK_INT >= 34 &&
             params.isUserInitiatedJob
@@ -228,7 +237,11 @@ object Transfers {
                         Transfers.wake(this@TransferJobService, scheduled - System.currentTimeMillis())
                     }
                 } finally {
-                    withContext(Dispatchers.Main) { jobFinished(params, false) }
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        Transfers.active = false
+                        jobFinished(params, false)
+                        if (queue.dao.all().any { it.state == DownloadState.QUEUED }) Transfers.wake(this@TransferJobService)
+                    }
                 }
             }
         return true
@@ -244,7 +257,8 @@ object Transfers {
 
     override fun onDestroy() {
         scope.launch {
-            queue.stopRunning()
+            task?.cancelAndJoin()
+            Transfers.active = false
             scope.cancel()
         }
         super.onDestroy()
@@ -255,6 +269,8 @@ object Transfers {
     @Inject lateinit var queue: QueueRepository
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    private var task: Job? = null
+
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(
@@ -262,15 +278,19 @@ object Transfers {
         flags: Int,
         startId: Int,
     ): Int {
+        if (task?.isActive == true) return START_NOT_STICKY
+        Transfers.active = true
         val n = Notifications(this)
         startForeground(410, n.notification())
-        scope.launch {
-            try {
-                queue.drain { n.update(it) }
-            } finally {
-                stopSelf()
+        task =
+            scope.launch {
+                try {
+                    queue.drain { n.update(it) }
+                } finally {
+                    Transfers.active = false
+                    stopSelf()
+                }
             }
-        }
         return START_NOT_STICKY
     }
 
@@ -287,7 +307,8 @@ object Transfers {
 
     override fun onDestroy() {
         scope.launch {
-            queue.stopRunning()
+            task?.cancelAndJoin()
+            Transfers.active = false
             scope.cancel()
         }
         super.onDestroy()

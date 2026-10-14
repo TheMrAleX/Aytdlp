@@ -1,6 +1,7 @@
 package con.themralex.aydlp
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import con.themralex.aydlp.ui.MainActivity
@@ -13,8 +14,9 @@ class UiSmokeTest {
     @Test fun onboardingAndNavigation() {
         compose.onNodeWithText("Let's begin").performClick()
         compose.onNodeWithText("Queue").performClick()
-        compose.onNodeWithText("Your queue").assertExists()
+        compose.onNodeWithContentDescription("Pause all").assertExists()
+        compose.onNodeWithText("Locate all").assertExists()
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Every detail, yours.").assertExists()
+        compose.onNodeWithText("Appearance").assertExists()
     }
 }

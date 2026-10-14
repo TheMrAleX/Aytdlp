@@ -230,12 +230,60 @@ import javax.inject.Singleton
         override suspend fun analyze(
             input: String,
             token: String,
-        ): MediaInfo {
-            val args = baseArgs() + listOf("--dump-single-json", "--skip-download", "--flat-playlist", "--", Inputs.normalize(input))
-            val output = run(token, args)
-            val json = JSONObject(output.lineSequence().first { it.startsWith("{") })
-            return parse(json, input)
+        ): MediaInfo =
+            withContext(Dispatchers.IO) {
+                val options = baseArgs()
+                val target = metadataFile(input, options)
+                val temporary = File.createTempFile("analysis-", ".json", context.cacheDir)
+                try {
+                    val args =
+                        listOf("--aytdlp-json-output", temporary.path) + options +
+                            listOf("--dump-single-json", "--skip-download", "--flat-playlist", "--playlist-end", "500", "--", Inputs.normalize(input))
+                    run(token, args)
+                    check(temporary.length() in 1..32L * 1024 * 1024) { "Invalid metadata size" }
+                    val raw = temporary.readText()
+                    val json = JSONObject(raw)
+                    val info = parse(json, input)
+                    withContext(Dispatchers.IO) {
+                        target.parentFile?.mkdirs()
+                        // Only complete video results can be downloaded without another extraction.
+                        if (info.entries.isEmpty() && info.formats.isNotEmpty() && info.live in listOf("", "not_live", "was_live")) {
+                            target.writeText(raw)
+                            metadataFile(info.url, options).writeText(raw)
+                        }
+                        target.parentFile
+                            ?.listFiles()
+                            ?.sortedByDescending { it.lastModified() }
+                            ?.drop(20)
+                            ?.forEach { it.delete() }
+                    }
+                    info
+                } finally {
+                    temporary.delete()
+                }
+            }
+
+        private fun metadataFile(
+            input: String,
+            options: List<String>,
+        ): File {
+            val key =
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest((Inputs.normalize(input) + options.joinToString("\n")).toByteArray())
+                    .joinToString("") { "%02x".format(it) }
+            return File(context.noBackupFilesDir, "metadata/$key.json")
         }
+
+        private suspend fun cachedMetadata(input: String): File? =
+            metadataFile(input, baseArgs()).takeIf {
+                it.exists() && System.currentTimeMillis() - it.lastModified() in 0..120_000
+            }
+
+        suspend fun cachedInfo(input: String): MediaInfo? =
+            withContext(Dispatchers.IO) {
+                cachedMetadata(input)?.let { runCatching { parse(JSONObject(it.readText()), input) }.getOrNull() }
+            }
 
         private fun parse(
             j: JSONObject,
@@ -361,7 +409,12 @@ import javax.inject.Singleton
             args += AdvancedArguments.parse(profile.custom)
             val cookie = cookies.materialize(directory)
             if (cookie != null) args += listOf("--cookies", cookie.path)
-            args += listOf("--", Inputs.normalize(input))
+            val cached = cachedMetadata(input)
+            if (cached != null && cookie == null && !profile.liveFromStart) {
+                args += listOf("--load-info-json", cached.path)
+            } else {
+                args += listOf("--", Inputs.normalize(input))
+            }
             val files = mutableListOf<File>()
             var last = 0L
             try {

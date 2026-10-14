@@ -2,6 +2,8 @@
 
 package con.themralex.aydlp.ui
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -28,6 +30,8 @@ import java.util.Locale
     vm: MainViewModel,
     enqueue: (String, Long) -> Unit,
     startQueue: () -> Unit,
+    resumeDownload: (String) -> Unit,
+    locateDownloads: () -> Unit,
     importLinks: () -> Unit,
     folder: () -> Unit,
     importCookies: () -> Unit,
@@ -69,24 +73,10 @@ import java.util.Locale
     AyTheme(settings.theme, settings.accent) {
         val t = LocalTokens.current
         Column(Modifier.fillMaxSize().background(t.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Label("Aytdlp", size = 28, bold = true)
-                    Label(tr("SAVE WHAT MOVES YOU", "GUARDA LO QUE TE MUEVE"), size = 10, color = t.muted)
-                }
-                Box(Modifier.clip(RoundedCornerShape(50.dp)).background(t.accent.copy(alpha = 0.1f)).padding(10.dp)) {
-                    Label(
-                        if (health?.ready ==
-                            true
-                        ) {
-                            tr("ENGINE READY", "MOTOR LISTO")
-                        } else {
-                            tr("CHECK ENGINE", "REVISAR MOTOR")
-                        },
-                        size = 10,
-                        bold = true,
-                        color = t.accent,
-                    )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Label("Aytdlp", Modifier.weight(1f), size = 26, bold = true)
+                if (health?.ready == false) {
+                    Chip(tr("Engine", "Motor")) { tab = 3 }
                 }
             }
             if (message.isNotBlank()) {
@@ -106,291 +96,194 @@ import java.util.Locale
                 }
             }
             val tabs = listOf(tr("Download", "Descargar"), tr("Queue", "Cola"), tr("Library", "Biblioteca"), tr("Settings", "Ajustes"))
-            when (tab) {
-                0 -> {
-                    LazyColumn(
-                        Modifier.weight(1f),
-                        contentPadding = PaddingValues(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Label(
-                                    tr("Your next favorite.\nReady to keep.", "Tu próximo favorito.\nListo para guardar."),
-                                    size = 34,
-                                    bold = true,
-                                )
-                                Label(
-                                    tr("Video, audio and everything in between.", "Vídeo, audio y todo lo que hay entre ambos."),
-                                    color = t.muted,
-                                )
-                            }
-                        }
-                        item {
-                            Panel {
-                                Field(
-                                    input,
-                                    { input = it },
-                                    tr("Paste a link or search YouTube", "Pega un enlace o busca en YouTube"),
-                                    lines = 3,
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    AyButton(
-                                        tr("Analyze", "Analizar"),
-                                        Modifier.weight(1f),
-                                        enabled =
-                                            input.isNotBlank() && !busy,
-                                    ) { vm.analyze(input) }
-                                    AyButton(tr("Paste", "Pegar"), primary = false) { input = clipboard() }
-                                }
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Chip(tr("Import .txt", "Importar .txt")) { importLinks() }
-                                    Chip(profile.name, true) {
-                                        showProfile =
-                                            true
+            AnimatedContent(
+                targetState = tab,
+                modifier = Modifier.weight(1f),
+                transitionSpec = {
+                    (fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 20 }) togetherWith fadeOut(tween(140))
+                },
+                label = "screen",
+            ) { screen ->
+                Column(Modifier.fillMaxSize()) {
+                    when (screen) {
+                        0 -> {
+                            Box(Modifier.weight(1f)) {
+                                LazyColumn(
+                                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 100.dp),
+                                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                                ) {
+                                    item {
+                                        Section(tr("Download", "Descargar"))
                                     }
-                                }
-                                if (busy) {
-                                    ProgressBar(40f)
-                                    Label(tr("Reading formats…", "Leyendo formatos…"), color = t.muted)
-                                    AyButton(tr("Cancel analysis", "Cancelar análisis"), primary = false) { vm.cancelAnalysis() }
-                                }
-                            }
-                        }
-                        if (info != null) {
-                            val media = info!!
-                            item {
-                                Panel {
-                                    if (media.thumbnail.isNotBlank()) {
-                                        AsyncImage(
-                                            media.thumbnail,
-                                            media.title,
-                                            Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp)),
-                                        )
-                                    }
-                                    Label(media.title, size = 21, bold = true)
-                                    Label("${media.channel} · ${duration(media.duration)}", color = t.muted)
-                                    if (media.live.isNotBlank() &&
-                                        media.live != "not_live"
-                                    ) {
-                                        Label("${tr("Live / premiere status","Estado directo / estreno")}: ${media.live}", color = t.accent)
-                                    }
-                                    if (media.entries.isEmpty()) {
-                                        Label(tr("Profile", "Perfil"), size = 11, color = t.muted)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Chip(profile.name, true) {
-                                                showProfile =
-                                                    true
+                                    item {
+                                        Panel {
+                                            Field(input, { input = it }, tr("Link or YouTube search", "Enlace o búsqueda en YouTube"), lines = 2)
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                AyButton(tr("Analyze", "Analizar"), Modifier.weight(1f), enabled = input.isNotBlank() && !busy) { vm.analyze(input) }
+                                                IconAction("import", tr("Import links", "Importar enlaces"), onClick = importLinks)
                                             }
-                                            Chip(tr("One tap", "Un toque")) { enqueue(media.url, 0) }
                                         }
-                                        AyButton(tr("Add to queue", "Añadir a cola"), Modifier.fillMaxWidth()) { enqueue(media.url, 0) }
-                                        Field(schedule, {
-                                            schedule =
-                                                it
-                                        }, tr("Schedule: yyyy-MM-dd HH:mm (optional)", "Programar: yyyy-MM-dd HH:mm (opcional)"))
-                                        if (schedule.isNotBlank()) {
-                                            AyButton(tr("Schedule download", "Programar descarga"), primary = false) {
-                                                runCatching {
-                                                    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT)
-                                                        .apply {
-                                                            isLenient =
-                                                                false
-                                                        }.parse(schedule)!!
-                                                        .time
-                                                }.onSuccess { enqueue(media.url, it) }.onFailure {
-                                                    vm.message.value =
-                                                        tr("Invalid date", "Fecha inválida")
+                                    }
+                                    if (busy) {
+                                        item { AnalysisSkeleton(tr("Cancel", "Cancelar"), vm::cancelAnalysis) }
+                                    } else if (info != null) {
+                                        val media = info!!
+                                        item {
+                                            Panel {
+                                                if (media.thumbnail.isNotBlank()) {
+                                                    AsyncImage(media.thumbnail, null, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                                                }
+                                                Label(media.title, size = 20, bold = true, maxLines = 3)
+                                                Label(listOf(media.channel, duration(media.duration)).filter { it.isNotBlank() }.joinToString(" · "), color = t.muted, size = 12)
+                                                if (media.entries.isEmpty()) {
+                                                    Row(
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(16.dp))
+                                                            .background(t.background)
+                                                            .clickable { showProfile = true }
+                                                            .padding(16.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                    ) {
+                                                        Column(Modifier.weight(1f)) {
+                                                            Label(tr("Quality", "Calidad"), size = 12, color = t.muted)
+                                                            Label(profileSummary(profile), bold = true)
+                                                        }
+                                                        AyIcon("chevron", t.accent)
+                                                    }
+                                                    AyButton(tr("Download", "Descargar"), Modifier.fillMaxWidth()) {
+                                                        enqueue(media.url, 0)
+                                                        tab = 1
+                                                    }
+                                                    var scheduling by remember { mutableStateOf(false) }
+                                                    TextAction(tr("Schedule", "Programar")) { scheduling = !scheduling }
+                                                    AnimatedVisibility(scheduling) {
+                                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                            Field(schedule, { schedule = it }, "yyyy-MM-dd HH:mm")
+                                                            AyButton(tr("Schedule", "Programar"), primary = false) {
+                                                                runCatching { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT).apply { isLenient = false }.parse(schedule)!!.time }
+                                                                    .onSuccess {
+                                                                        enqueue(media.url, it)
+                                                                        tab = 1
+                                                                    }.onFailure { vm.message.value = tr("Invalid date", "Fecha inválida") }
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    AyButton(tr("Queue all", "Añadir todos"), Modifier.fillMaxWidth()) {
+                                                        media.entries.forEach { enqueue(it.url, 0) }
+                                                        tab = 1
+                                                    }
                                                 }
                                             }
                                         }
-                                    } else {
-                                        Label("${media.entries.size} ${tr("items · choose below","elementos · selecciona abajo")}")
+                                        items(media.entries, key = { it.id + it.url }) { child ->
+                                            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Label(child.title, Modifier.weight(1f), maxLines = 2)
+                                                IconAction("download", tr("Add", "Añadir")) { enqueue(child.url, 0) }
+                                            }
+                                        }
+                                    }
+                                }
+                                AyFab("paste", tr("Paste", "Pegar"), Modifier.align(Alignment.BottomEnd).padding(20.dp), enabled = !busy) {
+                                    val pasted = clipboard()
+                                    if (pasted.isNotBlank()) {
+                                        input = pasted
+                                        vm.analyze(pasted)
                                     }
                                 }
                             }
-                            if (media.entries.isNotEmpty()) {
-                                item { AyButton(tr("Queue all", "Añadir todos")) { media.entries.forEach { enqueue(it.url, 0) } } }
-                                items(media.entries, key = {
-                                    it.id +
-                                        it.url
-                                }) { child ->
-                                    Panel {
-                                        Label(child.title, bold = true)
-                                        AyButton(tr("Add this item", "Añadir elemento"), primary = false) { enqueue(child.url, 0) }
+                        }
+                        1 -> {
+                            val transfers = rows.filter { it.state !in setOf(DownloadState.COMPLETED, DownloadState.CANCELED) }
+                            Box(Modifier.weight(1f)) {
+                                Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Label(tr("Queue", "Cola"), Modifier.weight(1f), size = 24, bold = true)
+                                        IconAction("play", tr("Resume all", "Reanudar todas"), onClick = startQueue)
+                                        IconAction("pause", tr("Pause all", "Pausar todas")) { vm.action { vm.queue.pauseAll() } }
+                                    }
+                                    if (transfers.isEmpty()) {
+                                        Empty(tr("Queue empty", "Cola vacía"), tr("Add a link to download.", "Añade un enlace para descargar."))
+                                    }
+                                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 100.dp)) {
+                                        items(transfers, key = { it.id }) { row ->
+                                            DownloadCard(row, es, onPause = { vm.action { vm.queue.pause(row.id) } }, onResume = {
+                                                resumeDownload(row.id)
+                                            }, onCancel = { vm.action { vm.queue.cancel(row.id) } }, onEdit = {
+                                                editingDownload = row.id
+                                                vm.profile.value = ProfileJson.decode(row.profile)
+                                                showProfile = true
+                                            })
+                                        }
                                     }
                                 }
-                            } else {
-                                item {
-                                    Section(
-                                        tr("Available formats", "Formatos disponibles"),
-                                        tr(
-                                            "All formats are downloadable. Playback depends on your device.",
-                                            "Puedes descargar todos. La reproducción depende del dispositivo.",
-                                        ),
+                                AyFab("folder", tr("Locate all", "Ubicar todas"), Modifier.align(Alignment.BottomEnd).padding(20.dp), onClick = locateDownloads)
+                            }
+                        }
+
+                        2 -> {
+                            Column(Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Section(tr("Library", "Biblioteca"))
+                                Field(query, {
+                                    query =
+                                        it
+                                }, tr("Search title or tags", "Buscar título o etiquetas"))
+                                if (rows.none {
+                                        it.state == DownloadState.COMPLETED
+                                    }
+                                ) {
+                                    Empty(
+                                        tr("No downloads yet", "Sin descargas"),
+                                        tr("Finished downloads appear here.", "Aquí aparecen las descargas completadas."),
                                     )
                                 }
-                                items(media.formats.sortedByDescending { it.height }, key = { it.id }) { f ->
-                                    Row(
-                                        Modifier.fillMaxWidth().background(t.surface, RoundedCornerShape(14.dp)).padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Label(f.label, bold = true, size = 13)
-                                            Label(
-                                                if (f.size >
-                                                    0
-                                                ) {
-                                                    bytes(f.size)
-                                                } else {
-                                                    tr("Size unavailable", "Tamaño no disponible")
-                                                },
-                                                size = 11,
-                                                color = t.muted,
-                                            )
-                                        }
-                                        Chip(
-                                            if (profile.formatId ==
-                                                f.id
+                                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                                    items(
+                                        rows
+                                            .filter {
+                                                it.state ==
+                                                    DownloadState.COMPLETED &&
+                                                    it.id !in hidden &&
+                                                    (it.title.contains(query, true) || it.tag.contains(query, true))
+                                            }.sortedByDescending { it.created },
+                                        key = { it.id },
+                                    ) { row ->
+                                        Panel {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             ) {
-                                                "✓"
-                                            } else {
-                                                "+"
-                                            },
-                                        ) { vm.edit { it.copy(formatId = f.id, name = f.label) } }
-                                    }
-                                }
-                            }
-                        }
-                        item {
-                            Label(
-                                tr("No account. No ads. No tracking.", "Sin cuenta. Sin anuncios. Sin rastreo."),
-                                size = 12,
-                                color = t.muted,
-                            )
-                        }
-                    }
-                }
-
-                1 -> {
-                    Column(Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Section(
-                            tr("Your queue", "Tu cola"),
-                            "${rows.count {it.state != DownloadState.COMPLETED && it.state != DownloadState.CANCELED}} ${tr(
-                                "transfers",
-                                "transferencias",
-                            )}",
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AyButton(tr("Start / resume all", "Iniciar / reanudar"), Modifier.weight(1f)) { startQueue() }
-                            AyButton(tr("Pause all", "Pausar todo"), primary = false) { vm.action { vm.queue.pauseAll() } }
-                        }
-                        if (rows.none {
-                                it.state != DownloadState.COMPLETED && it.state != DownloadState.CANCELED
-                            }
-                        ) {
-                            Empty(
-                                tr("A little room for something great.", "Hay espacio para algo grande."),
-                                tr("Add your first link to get started.", "Añade tu primer enlace para empezar."),
-                            )
-                        }
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                            items(
-                                rows.filter {
-                                    it.state !=
-                                        DownloadState.COMPLETED &&
-                                        it.state != DownloadState.CANCELED
-                                },
-                                key = { it.id },
-                            ) { row ->
-                                DownloadCard(row, es, onPause = { vm.action { vm.queue.pause(row.id) } }, onResume = {
-                                    vm.action {
-                                        vm.queue.resume(row.id)
-                                        vm.message.value =
-                                            tr("Press Start to run resumed transfers", "Pulsa Iniciar para ejecutar las transferencias")
-                                    }
-                                }, onCancel = { vm.action { vm.queue.cancel(row.id) } }, onEdit = {
-                                    editingDownload = row.id
-                                    vm.profile.value = ProfileJson.decode(row.profile)
-                                    showProfile = true
-                                })
-                            }
-                        }
-                    }
-                }
-
-                2 -> {
-                    Column(Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Section(tr("Made yours", "Tu biblioteca"), tr("Your collection, on your terms.", "Tu colección, a tu manera."))
-                        Field(query, {
-                            query =
-                                it
-                        }, tr("Search title or tags", "Buscar título o etiquetas"))
-                        if (rows.none {
-                                it.state == DownloadState.COMPLETED
-                            }
-                        ) {
-                            Empty(
-                                tr("Keep your first favorite.", "Guarda tu primer favorito."),
-                                tr("Finished downloads appear here.", "Aquí aparecen las descargas completadas."),
-                            )
-                        }
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                            items(
-                                rows
-                                    .filter {
-                                        it.state ==
-                                            DownloadState.COMPLETED &&
-                                            (it.title.contains(query, true) || it.tag.contains(query, true))
-                                    }.sortedByDescending { it.created },
-                                key = { it.id },
-                            ) { row ->
-                                Panel {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        AsyncImage(row.thumbnail, row.title, Modifier.size(72.dp).clip(RoundedCornerShape(12.dp)))
-                                        Column(Modifier.weight(1f)) {
-                                            Label(row.title, bold = true, maxLines = 2)
-                                            Label(bytes(row.bytes), size = 12, color = t.muted)
-                                        }
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        AyButton(tr("Play", "Reproducir"), Modifier.weight(1f)) { open(row) }
-                                        AyButton(tr("Share", "Compartir"), primary = false) { share(row) }
-                                        Chip(tr("More", "Más")) {
-                                            editingMedia = row
-                                            editedName = row.title
-                                            editedTag = row.tag
+                                                AsyncImage(row.thumbnail, row.title, Modifier.size(72.dp).clip(RoundedCornerShape(12.dp)))
+                                                Column(Modifier.weight(1f)) {
+                                                    Label(row.title, bold = true, maxLines = 2)
+                                                    Label(bytes(row.bytes), size = 12, color = t.muted)
+                                                }
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                AyButton(tr("Play", "Reproducir"), Modifier.weight(1f)) { open(row) }
+                                                AyButton(tr("Share", "Compartir"), primary = false) { share(row) }
+                                                Chip(tr("More", "Más")) {
+                                                    editingMedia = row
+                                                    editedName = row.title
+                                                    editedTag = row.tag
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+
+                        else -> {
+                            SettingsScreen(vm, es, folder, importCookies, exportBackup, restoreBackup, copy, language, battery, Modifier.weight(1f))
+                        }
                     }
                 }
-
-                else -> {
-                    SettingsScreen(vm, es, folder, importCookies, exportBackup, restoreBackup, copy, language, battery, Modifier.weight(1f))
-                }
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(t.surface)
-                    .border(1.dp, t.border)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                tabs.forEachIndexed { i, name ->
-                    Chip(
-                        name,
-                        tab == i,
-                    ) { tab = i }
-                }
-            }
+            NavigationDock(tabs, tab) { tab = it }
         }
+
         editingMedia?.let { row ->
             Dialog(onDismissRequest = { editingMedia = null }) {
                 Panel {
@@ -430,7 +323,7 @@ import java.util.Locale
         if (showProfile) {
             ProfileSheet(vm, es, onSave = {
                 val id = editingDownload
-                if (id != null) vm.action { vm.queue.dao.profile(id, ProfileJson.encode(vm.profile.value)) } else vm.saveProfile()
+                if (id != null) vm.action { vm.queue.dao.profile(id, ProfileJson.encode(vm.profile.value)) }
                 editingDownload = null
             }) { showProfile = false }
         }
@@ -440,11 +333,11 @@ import java.util.Locale
                 Box(Modifier.fillMaxSize().background(t.background).padding(32.dp), contentAlignment = Alignment.Center) {
                     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         Label("A", size = 80, bold = true, color = t.accent)
-                        Label(tr("A place for\nyour favorites.", "Un lugar para\ntus favoritos."), size = 38, bold = true)
+                        Label(tr("Video and audio", "Vídeo y audio"), size = 38, bold = true)
                         Label(
                             tr(
-                                "Save video and audio with a private, persistent queue. Your library stays yours.",
-                                "Guarda vídeo y audio con una cola privada y persistente. Tu biblioteca te pertenece.",
+                                "Paste a link to start.",
+                                "Pega un enlace para empezar.",
                             ),
                             size = 17,
                             color = t.muted,
@@ -489,7 +382,7 @@ import java.util.Locale
             Column(Modifier.weight(1f)) {
                 Label(row.title.ifBlank { row.url }, bold = true, maxLines = 2)
                 Label(
-                    row.state.name.replace('_', ' '),
+                    downloadStateLabel(row.state, es),
                     size = 11,
                     color =
                         if (row.state ==
@@ -502,7 +395,7 @@ import java.util.Locale
                 )
             }
         }
-        if (row.state !in StateMachine.active) Chip(if (es) "Editar perfil" else "Edit profile", onClick = onEdit)
+
         ProgressBar(row.progress)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Label("${row.progress.toInt()}% · ${bytes(row.bytes)}", size = 12)
@@ -514,7 +407,7 @@ import java.util.Locale
             Label("${row.fragment} / ${row.fragments} fragments", size = 11, color = t.muted)
         }
         if (row.failure.isNotBlank()) Label(row.failure, size = 12, color = t.muted)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (row.state ==
                 DownloadState.PAUSED ||
                 row.state == DownloadState.FAILED
@@ -523,7 +416,8 @@ import java.util.Locale
             } else {
                 AyButton(if (es) "Pausar" else "Pause", Modifier.weight(1f), primary = false, onClick = onPause)
             }
-            AyButton(if (es) "Cancelar" else "Cancel", primary = false, onClick = onCancel)
+            if (row.state !in StateMachine.active) IconAction("settings", if (es) "Editar" else "Edit", onClick = onEdit)
+            IconAction("close", if (es) "Cancelar" else "Cancel", onClick = onCancel)
         }
     }
 }
@@ -536,6 +430,9 @@ import java.util.Locale
 ) {
     val p by vm.profile.collectAsStateWithLifecycle()
     val saved by vm.profiles.collectAsStateWithLifecycle()
+    val media by vm.info.collectAsStateWithLifecycle()
+    var advanced by remember { mutableStateOf(false) }
+    var exactFormats by remember { mutableStateOf(false) }
     val t = LocalTokens.current
 
     fun tr(
@@ -557,7 +454,7 @@ import java.util.Locale
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Label(tr("Make it yours", "A tu medida"), Modifier.weight(1f), size = 25, bold = true)
+                    Label(tr("Quality and options", "Calidad y opciones"), Modifier.weight(1f), size = 25, bold = true)
                     Chip("×", onClick = onClose)
                 }
                 if (saved.isNotEmpty()) {
@@ -570,7 +467,7 @@ import java.util.Locale
                         }
                     }
                 }
-                Field(p.name, { v -> vm.edit { it.copy(name = v) } }, tr("Profile name", "Nombre del perfil"))
+                Label(profileSummary(p), color = t.accent)
                 Toggle(
                     tr("Audio only", "Solo audio"),
                     p.audio,
@@ -606,41 +503,70 @@ import java.util.Locale
                         }
                     }
                 }
-                Field(
-                    p.subtitles,
-                    { v -> vm.edit { it.copy(subtitles = v) } },
-                    tr("Subtitle languages (es,en)", "Idiomas de subtítulos (es,en)"),
-                )
-                Toggle(tr("Auto-generated subtitles", "Subtítulos automáticos"), p.autoSubs) { v -> vm.edit { it.copy(autoSubs = v) } }
-                Toggle(tr("Embed subtitles", "Incrustar subtítulos"), p.embedSubs) { v -> vm.edit { it.copy(embedSubs = v) } }
-                Toggle(tr("Embed metadata", "Incrustar metadatos"), p.metadata) { v -> vm.edit { it.copy(metadata = v) } }
-                Toggle(tr("Use thumbnail as cover", "Miniatura como carátula"), p.cover) { v -> vm.edit { it.copy(cover = v) } }
-                Toggle(tr("Include chapters", "Incluir capítulos"), p.chapters) { v -> vm.edit { it.copy(chapters = v) } }
-                Toggle(
-                    tr("Live: capture from start if available", "Directos: desde el inicio si está disponible"),
-                    p.liveFromStart,
-                ) { v ->
-                    vm.edit {
-                        it.copy(liveFromStart = v)
+                if (!p.audio && media?.formats?.isNotEmpty() == true) {
+                    TextAction(tr("Specific format", "Formato específico")) { exactFormats = !exactFormats }
+                    AnimatedVisibility(exactFormats) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            media!!.formats.filter { it.height > 0 }.sortedByDescending { it.height }.forEach { format ->
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (p.formatId.substringBefore('+') == format.id) t.accent.copy(alpha = 0.12f) else t.background)
+                                        .clickable {
+                                            vm.edit { it.copy(formatId = if (format.audioCodec == "none") "${format.id}+ba/best" else format.id, resolution = format.height) }
+                                        }.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Label(format.label, Modifier.weight(1f), size = 12)
+                                    if (format.size > 0) Label(bytes(format.size), size = 11, color = t.muted)
+                                }
+                            }
+                        }
                     }
                 }
-                Label("SponsorBlock", color = t.muted)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        "" to tr("Off", "No"),
-                        "mark" to tr("Mark", "Marcar"),
-                        "remove" to tr("Remove", "Omitir"),
-                    ).forEach { (value, label) ->
-                        Chip(label, p.sponsor == value) { vm.edit { it.copy(sponsor = value) } }
+                TextAction(tr("Advanced options", "Opciones avanzadas")) { advanced = !advanced }
+                AnimatedVisibility(advanced) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Field(p.name, { v -> vm.edit { it.copy(name = v) } }, tr("Profile name", "Nombre del perfil"))
+                        Field(
+                            p.subtitles,
+                            { v -> vm.edit { it.copy(subtitles = v) } },
+                            tr("Subtitle languages (es,en)", "Idiomas de subtítulos (es,en)"),
+                        )
+                        Toggle(tr("Auto-generated subtitles", "Subtítulos automáticos"), p.autoSubs) { v -> vm.edit { it.copy(autoSubs = v) } }
+                        Toggle(tr("Embed subtitles", "Incrustar subtítulos"), p.embedSubs) { v -> vm.edit { it.copy(embedSubs = v) } }
+                        Toggle(tr("Embed metadata", "Incrustar metadatos"), p.metadata) { v -> vm.edit { it.copy(metadata = v) } }
+                        Toggle(tr("Use thumbnail as cover", "Miniatura como carátula"), p.cover) { v -> vm.edit { it.copy(cover = v) } }
+                        Toggle(tr("Include chapters", "Incluir capítulos"), p.chapters) { v -> vm.edit { it.copy(chapters = v) } }
+                        Toggle(
+                            tr("Live: capture from start if available", "Directos: desde el inicio si está disponible"),
+                            p.liveFromStart,
+                        ) { v ->
+                            vm.edit {
+                                it.copy(liveFromStart = v)
+                            }
+                        }
+                        Label("SponsorBlock", color = t.muted)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                "" to tr("Off", "No"),
+                                "mark" to tr("Mark", "Marcar"),
+                                "remove" to tr("Remove", "Omitir"),
+                            ).forEach { (value, label) ->
+                                Chip(label, p.sponsor == value) { vm.edit { it.copy(sponsor = value) } }
+                            }
+                        }
+                        Field(p.trim, { v -> vm.edit { it.copy(trim = v) } }, tr("Trim: 00:10-01:20", "Recorte: 00:10-01:20"))
+                        Field(p.custom, { v ->
+                            vm.edit {
+                                it.copy(custom = v)
+                            }
+                        }, tr("Advanced arguments (validated)", "Argumentos avanzados (validados)"), lines = 4)
+                        TextAction(tr("Save preset", "Guardar perfil")) { vm.saveProfile() }
                     }
                 }
-                Field(p.trim, { v -> vm.edit { it.copy(trim = v) } }, tr("Trim: 00:10-01:20", "Recorte: 00:10-01:20"))
-                Field(p.custom, { v ->
-                    vm.edit {
-                        it.copy(custom = v)
-                    }
-                }, tr("Advanced arguments (validated)", "Argumentos avanzados (validados)"), lines = 4)
-                AyButton(tr("Save profile", "Guardar perfil"), Modifier.fillMaxWidth()) {
+                AyButton(tr("Apply", "Aplicar"), Modifier.fillMaxWidth()) {
                     runCatching { AdvancedArguments.parse(p.custom) }
                         .onSuccess {
                             onSave()
@@ -681,7 +607,7 @@ import java.util.Locale
     fun matches(text: String) = search.isBlank() || text.contains(search, true)
     LazyColumn(modifier, contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
-            Section(tr("Every detail, yours.", "Cada detalle, tuyo."))
+            Section(tr("Settings", "Ajustes"))
             Field(search, { search = it }, tr("Search settings", "Buscar ajustes"))
         }
         if (matches("Appearance Tema acento idioma")) {
